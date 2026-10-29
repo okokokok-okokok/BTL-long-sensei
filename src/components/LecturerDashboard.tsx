@@ -94,8 +94,6 @@ export function LecturerDashboard() {
       <div className="flex flex-wrap items-center gap-2"><label htmlFor="lecturer-home-semester" className="text-sm font-medium">Học kỳ</label><select id="lecturer-home-semester" className={control} value={semester} onChange={event => setSemester(event.target.value)}><option value="">Tất cả học kỳ</option>{semesters.map(term => <option key={term.value} value={term.value}>{term.label}</option>)}</select><button type="button" className={control} onClick={() => void load()} disabled={loading}>{loading ? 'Đang tải…' : 'Làm mới'}</button></div>
     </header>
 
-    {data.storage === 'demo' && <span className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">Chế độ demo</span>}
-
     <section id="lecturer-profile" aria-labelledby="lecturer-profile-title" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900 sm:p-6">
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
         <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800"><Image src={user?.avatarUrl || '/default-avatar.png'} alt="Ảnh đại diện giảng viên" fill className="object-cover" unoptimized /></div>

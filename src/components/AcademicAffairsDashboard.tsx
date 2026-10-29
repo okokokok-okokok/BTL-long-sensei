@@ -180,7 +180,6 @@ export default function AcademicAffairsDashboard() {
     {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"><span>{error} Dữ liệu đang hiển thị là lần tải thành công gần nhất.</span><button className={secondary} onClick={() => setRetryCount(value => value + 1)}><RefreshCw size={15} /> Thử lại</button></div>}
 
     <section className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-red-100 bg-red-50/50 px-4 py-3 text-sm dark:border-red-950 dark:bg-red-950/20">
-      {data.storage === 'demo' && <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900">Chế độ demo</span>}
       <p><strong>Đăng ký:</strong> {data.registrationWindow.label}.</p><p><strong>Nhập điểm:</strong> {data.gradeEntryWindow.label}.</p>
     </section>
 
