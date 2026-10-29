@@ -7,6 +7,7 @@ import { createDemoState } from './seed';
 import { PortalError } from './domain';
 import { ensureDirectories } from './directories';
 import { importLegacyDemoCurricula } from './curricula';
+import { purgeInvalidLecturerTickets } from './support';
 
 export const collections = ['catalogs', 'lecturers', 'curriculumPrograms', 'curriculumVersions', 'users', 'cohorts', 'students', 'subjects', 'sections', 'meetings', 'enrollments', 'results', 'audits', 'supportTickets', 'curriculumAssignments'] as const;
 const tableNames: Record<typeof collections[number], string> = {
@@ -69,8 +70,20 @@ export function prismaAdapter(tx: Prisma.TransactionClient): Queryable {
     await tx.$executeRawUnsafe(sql, ...values); return { rows: [] };
   } };
 }
+let demoCache: { state: PortalState; mtime: number } | null = null;
+let pgCache: { state: PortalState; timestamp: number } | null = null;
+const PG_CACHE_TTL_MS = 2000;
+
+export function invalidateStoreCache() {
+  demoCache = null;
+  pgCache = null;
+}
+
 export async function withState<T>(write: boolean, fn: (state: PortalState) => T | Promise<T>): Promise<T> {
   if (storageMode() === 'postgresql') {
+    if (!write && pgCache && Date.now() - pgCache.timestamp < PG_CACHE_TTL_MS) {
+      return await fn(structuredClone(pgCache.state));
+    }
     try {
       return await client().$transaction(async tx => {
         const db = prismaAdapter(tx);
@@ -78,8 +91,15 @@ export async function withState<T>(write: boolean, fn: (state: PortalState) => T
         const state = await loadState(db);
         const before = write ? structuredClone(state) : undefined;
         ensureDirectories(state, process.env.PORTAL_CURRENT_SEMESTER);
+        purgeInvalidLecturerTickets(state);
         const value = await fn(state);
-        if (write) await saveState(db, state, before);
+        if (write) {
+          await saveState(db, state, before);
+          invalidateStoreCache();
+          pgCache = { state: structuredClone(state), timestamp: Date.now() };
+        } else {
+          pgCache = { state: structuredClone(state), timestamp: Date.now() };
+        }
         return value;
       }, { maxWait: 15000, timeout: 30000, isolationLevel: write ? Prisma.TransactionIsolationLevel.ReadCommitted : Prisma.TransactionIsolationLevel.RepeatableRead });
     } catch (e) {
@@ -90,6 +110,16 @@ export async function withState<T>(write: boolean, fn: (state: PortalState) => T
     }
   }
   const location = path.resolve(process.env.PORTAL_DEMO_FILE || path.join(process.cwd(), '.data', 'portal-demo.json'));
+  if (!write && demoCache) {
+    try {
+      const stat = await fs.stat(location);
+      if (stat.mtimeMs === demoCache.mtime) {
+        return await fn(structuredClone(demoCache.state));
+      }
+    } catch {
+      // file might not exist yet, proceed
+    }
+  }
   await fs.mkdir(path.dirname(location), { recursive: true });
   const release = await lockfile.lock(location, { realpath: false, retries: { retries: 40, minTimeout: 50, maxTimeout: 250 }, stale: 30000 });
   try {
@@ -103,6 +133,7 @@ export async function withState<T>(write: boolean, fn: (state: PortalState) => T
     }
     const curriculaUpgraded = importLegacyDemoCurricula(state);
     const directoriesUpgraded = ensureDirectories(state, process.env.PORTAL_CURRENT_SEMESTER);
+    purgeInvalidLecturerTickets(state);
     const upgraded = directoriesUpgraded || curriculaUpgraded;
     const value = await fn(state);
     if (write || initialized || upgraded) {
@@ -117,6 +148,11 @@ export async function withState<T>(write: boolean, fn: (state: PortalState) => T
       const temporary = `${location}.${process.pid}.tmp`;
       await fs.writeFile(temporary, JSON.stringify(state, null, 2), { mode: 0o600 });
       await fs.rename(temporary, location);
+      const stat = await fs.stat(location).catch(() => null);
+      if (stat) demoCache = { state: structuredClone(state), mtime: stat.mtimeMs };
+    } else {
+      const stat = await fs.stat(location).catch(() => null);
+      if (stat) demoCache = { state: structuredClone(state), mtime: stat.mtimeMs };
     }
     return value;
   } finally { await release(); }

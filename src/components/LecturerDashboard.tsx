@@ -8,6 +8,7 @@ import { apiFetch } from '@/lib/apiFetch';
 import { PERIOD_TIMES } from '@/lib/portal/options';
 import { sameSemester, semesterLabel, semesterChoices } from '@/lib/portal/semester';
 import type { PortalView } from '@/lib/portal/types';
+import { onPortalChanged } from '@/lib/portal-client-events';
 
 const control = 'rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900';
 const sectionKey = 'ptit:lecturer-semester';
@@ -47,7 +48,11 @@ export function LecturerDashboard() {
   }, []);
 
   useEffect(() => {
-    if (!authLoading && role === 'lecturer' && userId) void load();
+    if (!authLoading && role === 'lecturer' && userId) {
+      void load();
+      const unsubscribe = onPortalChanged(load);
+      return () => unsubscribe();
+    }
   }, [authLoading, role, userId, load]);
 
   const semesters = useMemo(() => {

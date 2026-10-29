@@ -5,6 +5,7 @@ import { apiFetch } from '@/lib/apiFetch';
 import { useAuth } from '@/context/AuthContext';
 import type { PortalView } from '@/lib/portal/types';
 import { sameSemester, semesterLabel } from '@/lib/portal/semester';
+import { onPortalChanged } from '@/lib/portal-client-events';
 
 export function PersonalTodaySchedule() {
   const { user } = useAuth();
@@ -12,8 +13,12 @@ export function PersonalTodaySchedule() {
   const [error, setError] = useState('');
   useEffect(() => {
     let active = true;
-    apiFetch('/api/portal').then(async response => { const json = await response.json(); if (!response.ok) throw new Error(json.message); if (active) setData(json.data); }).catch(e => { if (active) setError(e.message); });
-    return () => { active = false; };
+    const load = () => {
+      apiFetch('/api/portal').then(async response => { const json = await response.json(); if (!response.ok) throw new Error(json.message); if (active) setData(json.data); }).catch(e => { if (active) setError(e.message); });
+    };
+    load();
+    const unsubscribe = onPortalChanged(load);
+    return () => { active = false; unsubscribe(); };
   }, [user?.id]);
   const now = new Date();
   const todayParts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);

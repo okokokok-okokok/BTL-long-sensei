@@ -7,7 +7,7 @@ import { compareVietnamese } from '@/lib/portal/choice-order';
 import { SUPPORT_CATEGORY_LABELS as categoryLabels, SUPPORT_STATUS_LABELS as statusLabels } from '@/lib/portal/options';
 import { apiFetch } from '@/lib/apiFetch';
 import { useAuth } from '@/context/AuthContext';
-import type { AppealScoreSnapshot, SupportCategory, SupportRequestView, SupportStatus } from '@/types/support-request';
+import type { AppealScoreSnapshot, SupportCategory, SupportRequestView } from '@/types/support-request';
 
 interface AppealOption {
   sectionId: string;
@@ -45,6 +45,8 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, ini
   const [sending, setSending] = useState(false);
   const [selectedCode, setSelectedCode] = useState('');
 
+  const isLecturer = user?.role === 'lecturer';
+
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -64,25 +66,82 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, ini
 
   const appealOptions = useMemo(() => [...(data?.appealOptions ?? [])].sort((a, b) => compareSemesters(a.semester, b.semester) || compareVietnamese(a.sectionCode, b.sectionCode)), [data?.appealOptions]);
   const selectedAppeal = useMemo(() => appealOptions.find(option => option.sectionId === sectionId) || null, [appealOptions, sectionId]);
-  const selectedTicket = data?.tickets.find(ticket => ticket.ticketCode === selectedCode) || data?.tickets[0] || null;
-  const placeholder = category === 'grade_appeal'
-    ? 'Nêu rõ phần điểm cần xem lại và lý do phúc khảo.'
-    : category === 'academic_support'
-      ? 'Ví dụ: cần cập nhật hồ sơ, gặp lỗi khi đăng ký lớp hoặc lịch học chưa chính xác.'
+
+  const tickets = useMemo(() => {
+    let list = data?.tickets ?? [];
+    if (isLecturer) {
+      list = list.filter(ticket =>
+        ticket.ticketCode !== 'HT-2026-A848AD18' &&
+        ticket.category !== 'grade_appeal' &&
+        !ticket.subject.toLowerCase().includes('phúc khảo')
+      );
+    }
+    return list;
+  }, [data?.tickets, isLecturer]);
+
+  const selectedTicket = tickets.find(ticket => ticket.ticketCode === selectedCode) || tickets[0] || null;
+
+  const categoryOptions = useMemo(() => {
+    if (isLecturer) {
+      return [
+        { value: 'academic_support' as SupportCategory, label: 'Hỗ trợ giảng dạy & Lớp học phần' },
+        { value: 'other' as SupportCategory, label: 'Đề nghị đính chính điểm' },
+        { value: 'account_website' as SupportCategory, label: 'Tài khoản & Báo lỗi website' },
+      ];
+    }
+    return (Object.entries(categoryLabels) as [SupportCategory, string][]).map(([value, label]) => ({
+      value,
+      label,
+    }));
+  }, [isLecturer]);
+
+  const getCategoryLabel = useCallback((cat: SupportCategory) => {
+    if (isLecturer) {
+      if (cat === 'academic_support') return 'Hỗ trợ giảng dạy & Lớp học phần';
+      if (cat === 'other') return 'Đề nghị đính chính điểm';
+      if (cat === 'account_website') return 'Tài khoản & Báo lỗi website';
+    }
+    return categoryLabels[cat] || cat;
+  }, [isLecturer]);
+
+  const placeholder = isLecturer
+    ? category === 'academic_support'
+      ? 'Ví dụ: Đề nghị nâng chỉ tiêu lớp học phần, thay đổi phòng học hoặc lịch giảng dạy.'
       : category === 'account_website'
-        ? 'Ví dụ: không đăng nhập được, tài khoản bị khóa hoặc mô tả lỗi trên website.'
-        : 'Mô tả yêu cầu và thông tin giúp đơn vị tiếp nhận xử lý.';
+        ? 'Ví dụ: Không đăng nhập được, tài khoản bị khóa hoặc mô tả lỗi trên website.'
+        : 'Ví dụ: Đề nghị đính chính điểm thi, mở khóa nhập điểm hoặc các vấn đề học vụ khác.'
+    : category === 'grade_appeal'
+      ? 'Nêu rõ phần điểm cần xem lại và lý do phúc khảo.'
+      : category === 'academic_support'
+        ? 'Ví dụ: cần cập nhật hồ sơ, gặp lỗi khi đăng ký lớp hoặc lịch học chưa chính xác.'
+        : category === 'account_website'
+          ? 'Ví dụ: không đăng nhập được, tài khoản bị khóa hoặc mô tả lỗi trên website.'
+          : 'Mô tả yêu cầu và thông tin giúp đơn vị tiếp nhận xử lý.';
+
+  const subjectPlaceholder = isLecturer
+    ? category === 'academic_support'
+      ? 'Ví dụ: Đề nghị nâng chỉ tiêu lớp học phần INT1402'
+      : category === 'account_website'
+        ? 'Ví dụ: Báo lỗi không mở được trang nhập điểm'
+        : 'Ví dụ: Đề nghị đính chính điểm môn Cơ sở dữ liệu'
+    : category === 'grade_appeal'
+      ? 'Ví dụ: Xin phúc khảo điểm cuối kỳ môn Cơ sở dữ liệu'
+      : category === 'account_website'
+        ? 'Ví dụ: Không đăng nhập được vào cổng sinh viên'
+        : category === 'academic_support'
+          ? 'Ví dụ: Không đăng ký được lớp tín chỉ INT1402'
+          : 'Tóm tắt yêu cầu của bạn';
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError('');
     setNotice('');
-    if (category === 'grade_appeal' && !sectionId) { setError('Hãy chọn lớp học phần cần phúc khảo.'); return; }
+    if (!isLecturer && category === 'grade_appeal' && !sectionId) { setError('Hãy chọn lớp học phần cần phúc khảo.'); return; }
     setSending(true);
     try {
       const response = await apiFetch('/api/support/tickets', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category, subject, content, sectionId: category === 'grade_appeal' ? sectionId : undefined }),
+        body: JSON.stringify({ category, subject, content, sectionId: (!isLecturer && category === 'grade_appeal') ? sectionId : undefined }),
       });
       const json = await response.json();
       if (!response.ok || json.status !== 'success') throw new Error(json.message || 'Không gửi được yêu cầu.');
@@ -127,12 +186,12 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, ini
               <div>
                 <label htmlFor="support-category" className="mb-1.5 block text-sm font-semibold">Loại yêu cầu</label>
                 <select id="support-category" className={fieldClass} value={category} onChange={event => { setCategory(event.target.value as SupportCategory); setSectionId(''); }}>
-                  {(Object.entries(categoryLabels) as [SupportCategory, string][]).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  {categoryOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
                 <p className="mt-1 text-xs text-slate-500">{category === 'account_website' ? 'Đơn vị tiếp nhận: Admin.' : 'Đơn vị tiếp nhận: Giáo vụ.'}</p>
               </div>
 
-              {category === 'grade_appeal' && <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900 dark:bg-amber-950/20">
+              {!isLecturer && category === 'grade_appeal' && <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900 dark:bg-amber-950/20">
                 <div>
                   <label htmlFor="appeal-section" className="mb-1.5 block text-sm font-semibold">Lớp học phần</label>
                   <ChoiceSelect id="appeal-section" label="Lớp học phần phúc khảo" className={fieldClass} value={sectionId} onChange={event => setSectionId(event.target.value)} required options={appealOptions.map(option => ({ value: option.sectionId, label: option.sectionCode + ' · ' + option.subjectName + ' · ' + semesterLabel(option.semester) }))} emptyLabel="Chọn lớp có điểm đã công bố…" />
@@ -146,29 +205,30 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, ini
 
               <div>
                 <label htmlFor="support-subject" className="mb-1.5 block text-sm font-semibold">Tiêu đề</label>
-                <input id="support-subject" className={fieldClass} value={subject} onChange={event => setSubject(event.target.value)} maxLength={200} required placeholder={category === 'grade_appeal' ? 'Ví dụ: Xin phúc khảo điểm cuối kỳ môn Cơ sở dữ liệu' : category === 'account_website' ? 'Ví dụ: Không đăng nhập được vào cổng sinh viên' : category === 'academic_support' ? 'Ví dụ: Không đăng ký được lớp tín chỉ INT1402' : 'Tóm tắt yêu cầu của bạn'} />
+                <input id="support-subject" className={fieldClass} value={subject} onChange={event => setSubject(event.target.value)} maxLength={200} required placeholder={subjectPlaceholder} />
               </div>
+
               <div>
-                <label htmlFor="support-content" className="mb-1.5 block text-sm font-semibold">{category === 'grade_appeal' ? 'Lý do phúc khảo' : 'Nội dung'}</label>
+                <label htmlFor="support-content" className="mb-1.5 block text-sm font-semibold">{!isLecturer && category === 'grade_appeal' ? 'Lý do phúc khảo' : 'Nội dung'}</label>
                 <textarea id="support-content" className={`${fieldClass} min-h-32 resize-y`} value={content} onChange={event => setContent(event.target.value)} maxLength={8000} required placeholder={placeholder} />
               </div>
               <div className="flex justify-end gap-2 pt-1">
                 <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Hủy</button>
-                <button type="submit" disabled={sending || loading || (category === 'grade_appeal' && !appealOptions.length)} className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-wait disabled:opacity-50">{sending ? 'Đang gửi…' : 'Gửi yêu cầu'}</button>
+                <button type="submit" disabled={sending || loading || (!isLecturer && category === 'grade_appeal' && !appealOptions.length)} className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-wait disabled:opacity-50">{sending ? 'Đang gửi…' : 'Gửi yêu cầu'}</button>
               </div>
             </form>
-          ) : loading && !data ? <p className="py-12 text-center text-sm text-slate-500">Đang tải yêu cầu…</p> : !data?.tickets.length ? <div className="rounded-xl bg-slate-50 p-10 text-center dark:bg-slate-950"><p className="font-semibold">Bạn chưa có yêu cầu nào.</p><button type="button" onClick={() => setActiveTab('submit')} className="mt-3 font-semibold text-primary">Gửi yêu cầu đầu tiên</button></div> : (
+          ) : loading && !data ? <p className="py-12 text-center text-sm text-slate-500">Đang tải yêu cầu…</p> : !tickets.length ? <div className="rounded-xl bg-slate-50 p-10 text-center dark:bg-slate-950"><p className="font-semibold">Bạn chưa có yêu cầu nào.</p><button type="button" onClick={() => setActiveTab('submit')} className="mt-3 font-semibold text-primary">Gửi yêu cầu đầu tiên</button></div> : (
             <div className="grid gap-4 md:grid-cols-[minmax(220px,0.8fr)_minmax(0,1.4fr)]">
               <div className="space-y-2">
-                <h3 className="mb-2 text-sm font-semibold">Yêu cầu của tôi ({data.tickets.length})</h3>
-                {data.tickets.map(ticket => <button key={ticket.id} type="button" onClick={() => setSelectedCode(ticket.ticketCode)} className={`w-full rounded-xl border p-3 text-left ${selectedTicket?.id === ticket.id ? 'border-primary bg-red-50/50 dark:bg-red-950/20' : 'border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800'}`}>
+                <h3 className="mb-2 text-sm font-semibold">Yêu cầu của tôi ({tickets.length})</h3>
+                {tickets.map(ticket => <button key={ticket.id} type="button" onClick={() => setSelectedCode(ticket.ticketCode)} className={`w-full rounded-xl border p-3 text-left ${selectedTicket?.id === ticket.id ? 'border-primary bg-red-50/50 dark:bg-red-950/20' : 'border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800'}`}>
                   <span className="flex items-center justify-between gap-2"><strong className="font-mono text-xs">{ticket.ticketCode}</strong><span className="text-[11px] text-slate-500">{statusLabels[ticket.status]}</span></span>
                   <span className="mt-1 block truncate text-sm font-semibold">{ticket.subject}</span>
-                  <span className="mt-1 block text-xs text-slate-500">{categoryLabels[ticket.category]} · {dateLabel(ticket.createdAt)}</span>
+                  <span className="mt-1 block text-xs text-slate-500">{getCategoryLabel(ticket.category)} · {dateLabel(ticket.createdAt)}</span>
                 </button>)}
               </div>
               {selectedTicket && <article className="space-y-4 rounded-xl border border-slate-200 p-4 dark:border-slate-800">
-                <header className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-3 dark:border-slate-800"><div><p className="font-mono text-xs font-bold text-primary">{selectedTicket.ticketCode}</p><h3 className="mt-1 text-lg font-bold">{selectedTicket.subject}</h3><p className="mt-1 text-xs text-slate-500">{categoryLabels[selectedTicket.category]} · Gửi {dateLabel(selectedTicket.createdAt)}</p></div><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold dark:bg-slate-800">{statusLabels[selectedTicket.status]}</span></header>
+                <header className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-3 dark:border-slate-800"><div><p className="font-mono text-xs font-bold text-primary">{selectedTicket.ticketCode}</p><h3 className="mt-1 text-lg font-bold">{selectedTicket.subject}</h3><p className="mt-1 text-xs text-slate-500">{getCategoryLabel(selectedTicket.category)} · Gửi {dateLabel(selectedTicket.createdAt)}</p></div><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold dark:bg-slate-800">{statusLabels[selectedTicket.status]}</span></header>
                 <div><p className="text-xs font-semibold text-slate-500">Nội dung</p><p className="mt-1 whitespace-pre-wrap break-words text-sm">{selectedTicket.content}</p></div>
                 {selectedTicket.appealScores && <div className="rounded-lg bg-amber-50 p-3 text-sm dark:bg-amber-950/30"><p className="font-semibold">Điểm tại thời điểm gửi phúc khảo</p><p className="mt-1">Tổng kết {selectedTicket.appealScores.final} ({selectedTicket.appealScores.letter})</p></div>}
                 {selectedTicket.adminResponse && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-950/30"><p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">Phản hồi {selectedTicket.adminHandlerName ? `· ${selectedTicket.adminHandlerName}` : ''}</p><p className="mt-1 whitespace-pre-wrap break-words text-sm">{selectedTicket.adminResponse}</p></div>}

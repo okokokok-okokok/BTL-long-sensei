@@ -8,6 +8,7 @@ import { ArrowRight, CalendarDays, CheckCircle2, ClipboardList, Clock3, Graduati
 import { useAuth } from '@/context/AuthContext';
 import { apiFetch } from '@/lib/apiFetch';
 import { semesterLabel } from '@/lib/portal/semester';
+import { onPortalChanged } from '@/lib/portal-client-events';
 import type { buildAcademicDashboard } from '@/lib/portal/academic-dashboard';
 
 type Dashboard = ReturnType<typeof buildAcademicDashboard> & { storage: 'demo' | 'postgresql' };
@@ -101,12 +102,20 @@ export default function AcademicAffairsDashboard() {
     const controller = new AbortController();
     setLoading(true);
     setError('');
-    setData(null);
+
     load(controller.signal).then(result => { setData(result); setSemester(current => current && current !== result.semester ? result.semester : current); }).catch(reason => {
       if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Không tải được tổng quan đào tạo.');
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [user, role, authLoading, load, retryCount]);
+
+  useEffect(() => {
+    if (!user || authLoading || (role !== 'admin' && role !== 'academic')) return;
+    const unsubscribe = onPortalChanged(() => {
+      setRetryCount(count => count + 1);
+    });
+    return () => unsubscribe();
+  }, [user, role, authLoading]);
 
   const openRoster = useCallback(async (sectionId: string, sectionCode: string) => {
     setRosterSection({ id: sectionId, code: sectionCode });

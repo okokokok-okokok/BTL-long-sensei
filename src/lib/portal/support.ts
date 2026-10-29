@@ -111,3 +111,11 @@ export function publishedAppealOptions(state: PortalState, studentId: string) {
 export function appealOptionForStudent(state: PortalState, studentId: string, sectionId: string) {
   return publishedAppealOptions(state, studentId).find(option => option.sectionId === sectionId) || null;
 }
+
+export function purgeInvalidLecturerTickets(state: PortalState) {
+  if (!Array.isArray(state.supportTickets)) return;
+  state.supportTickets = state.supportTickets.filter(ticket =>
+    ticket.ticketCode !== 'HT-2026-A848AD18' &&
+    !(ticket.userRole === 'lecturer' && (ticket.category === 'grade_appeal' || ticket.subject.toLowerCase().includes('phúc khảo')))
+  );
+}

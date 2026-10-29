@@ -1,11 +1,11 @@
-﻿'use client';
+'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { apiFetch } from '@/lib/apiFetch';
 import { registrationIssue } from '@/lib/portal/registration';
-import { notifyPortalChanged, PORTAL_CHANGED_KEY } from '@/lib/portal-client-events';
+import { notifyPortalChanged, onPortalChanged } from '@/lib/portal-client-events';
 import { gradeSummary, studentSummary } from '@/lib/portal/analytics';
 import { mondayInVietnam as monday, plusDays } from '@/lib/portal/calendar';
 import { ChoiceSelect } from '@/components/ChoiceSelect';
@@ -121,7 +121,13 @@ export function AcademicWorkspace({ initialTab = 'overview', onlyTab, initialSem
     } catch (e) { if (version === loadVersion.current) setNotice({ error: true, text: e instanceof Error ? e.message : 'Không tải được dữ liệu.' }); }
     finally { if (version === loadVersion.current) setLoading(false); }
   }, []);
-  useEffect(() => { if (user && !authLoading) { setData(null); setPending({}); load(); } }, [user?.id, authLoading, load]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (user && !authLoading) {
+      setData(prev => (prev && prev.me?.id === user.id ? prev : null));
+      setPending({});
+      void load();
+    }
+  }, [user?.id, authLoading, load]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { setReportMode(role === 'student' ? 'individual' : initialReport || 'section'); }, [role, initialReport]);
   useEffect(() => {
     if (role !== 'student' || !user?.id || !data?.studentAcademicCalendar || semesterInitializedFor.current === user.id) return;
@@ -218,11 +224,11 @@ export function AcademicWorkspace({ initialTab = 'overview', onlyTab, initialSem
       if (dirty.current || saving.current) { setNeedsRefresh(true); return; }
       void load();
     };
-    const storage = (event: StorageEvent) => { if (event.key === PORTAL_CHANGED_KEY) refresh(); };
-    window.addEventListener('focus', refresh); window.addEventListener('storage', storage); document.addEventListener('visibilitychange', refresh);
-    const poll = window.setInterval(refresh, 30000);
+    const unsubscribe = onPortalChanged(refresh);
+
+    const poll = window.setInterval(refresh, 10000);
     const clock = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => { window.removeEventListener('focus', refresh); window.removeEventListener('storage', storage); document.removeEventListener('visibilitychange', refresh); clearInterval(poll); clearInterval(clock); };
+    return () => { unsubscribe(); clearInterval(poll); clearInterval(clock); };
   }, [user?.id, authLoading, load]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!form && !roster) return;

@@ -31,7 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSupport, mobileOpen = fa
       return [
         { name: 'Tài khoản & phân quyền', href: '/admin/accounts', icon: 'manage_accounts' },
         { name: 'Yêu cầu tài khoản & báo lỗi', href: '/admin/support', icon: 'support_agent' },
-        { name: 'Cấu hình hệ thống', href: '/admin/settings', icon: 'settings' },
+
         { name: 'Nhật ký hệ thống', href: '/admin/audit', icon: 'history' },
       ];
     }

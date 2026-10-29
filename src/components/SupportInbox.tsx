@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { SUPPORT_CATEGORY_LABELS as categoryLabels, SUPPORT_STATUS_LABELS as statusLabels, SUPPORT_STATUS_OPTIONS } from '@/lib/portal/options';
 import { apiFetch } from '@/lib/apiFetch';
 import { useAuth } from '@/context/AuthContext';
+import { notifyPortalChanged, onPortalChanged } from '@/lib/portal-client-events';
 import type { SupportRequestView, SupportStatus } from '@/types/support-request';
 
 interface InboxData { tickets: SupportRequestView[]; storage: 'demo' | 'postgresql' }
@@ -12,6 +13,14 @@ const textareaClass = 'w-full rounded-xl border border-slate-300 bg-white px-3 p
 function dateLabel(value: string) {
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(date) : '—';
+}
+
+function ticketCategoryLabel(ticket: SupportRequestView) {
+  if (ticket.userRole === 'lecturer') {
+    if (ticket.category === 'academic_support') return 'Hỗ trợ giảng dạy & Lớp học phần';
+    if (ticket.category === 'other') return 'Đề nghị đính chính điểm';
+  }
+  return categoryLabels[ticket.category] || ticket.category;
 }
 
 export function SupportInbox() {
@@ -39,7 +48,13 @@ export function SupportInbox() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { if (role === 'admin' || role === 'academic') void load(); }, [role, user, load]);
+  useEffect(() => {
+    if (role === 'admin' || role === 'academic') {
+      void load();
+      const unsubscribe = onPortalChanged(load);
+      return () => unsubscribe();
+    }
+  }, [role, user, load]);
   const filtered = useMemo(() => (data?.tickets || []).filter(ticket => (statusFilter === 'all' || (statusFilter === 'unfinished' ? ticket.status !== 'closed' : ticket.status === statusFilter)) && `${ticket.ticketCode} ${ticket.subject} ${ticket.userName} ${ticket.userCode}`.toLocaleLowerCase('vi').includes(search.toLocaleLowerCase('vi'))), [data, search, statusFilter]);
   const selected = filtered.find(ticket => ticket.ticketCode === selectedCode) || filtered[0] || null;
 
@@ -62,6 +77,7 @@ export function SupportInbox() {
       const json = await result.json();
       if (!result.ok || json.status !== 'success') throw new Error(json.message || 'Không lưu được cập nhật.');
       setNotice(`Đã cập nhật yêu cầu ${selected.ticketCode}.`);
+      notifyPortalChanged();
       await load();
       setSelectedCode(selected.ticketCode);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Không lưu được cập nhật.'); }
@@ -81,11 +97,11 @@ export function SupportInbox() {
     {loading && !data ? <div className="rounded-xl border p-10 text-center text-sm text-slate-500">Đang tải yêu cầu…</div> : error && !data ? null : !filtered.length ? <div className="rounded-xl border border-slate-200 bg-white p-10 text-center dark:border-slate-800 dark:bg-slate-900"><p className="font-semibold">{search ? 'Không tìm thấy yêu cầu phù hợp.' : 'Chưa có yêu cầu cần xử lý.'}</p></div> : <div className="grid gap-4 xl:grid-cols-[minmax(260px,0.8fr)_minmax(0,1.5fr)]">
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <p className="mb-2 text-xs text-slate-500">{filtered.length} yêu cầu · {role === 'admin' ? 'Admin' : 'Giáo vụ'}</p>
-        <ul className="max-h-[65vh] space-y-2 overflow-y-auto">{filtered.map(ticket => <li key={ticket.id}><button type="button" onClick={() => { setSelectedCode(ticket.ticketCode); setError(''); setNotice(''); }} className={`w-full rounded-xl border p-3 text-left ${selected?.id === ticket.id ? 'border-primary bg-red-50/50 dark:bg-red-950/20' : 'border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800'}`}><span className="flex items-center justify-between gap-2"><strong className="font-mono text-xs">{ticket.ticketCode}</strong><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] dark:bg-slate-800">{statusLabels[ticket.status]}</span></span><span className="mt-1 block truncate text-sm font-semibold">{ticket.subject}</span><span className="mt-1 block text-xs text-slate-500">{categoryLabels[ticket.category]} · {ticket.userName}</span><span className="mt-1 block text-[11px] text-slate-400">{dateLabel(ticket.createdAt)}</span></button></li>)}</ul>
+        <ul className="max-h-[65vh] space-y-2 overflow-y-auto">{filtered.map(ticket => <li key={ticket.id}><button type="button" onClick={() => { setSelectedCode(ticket.ticketCode); setError(''); setNotice(''); }} className={`w-full rounded-xl border p-3 text-left ${selected?.id === ticket.id ? 'border-primary bg-red-50/50 dark:bg-red-950/20' : 'border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800'}`}><span className="flex items-center justify-between gap-2"><strong className="font-mono text-xs">{ticket.ticketCode}</strong><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] dark:bg-slate-800">{statusLabels[ticket.status]}</span></span><span className="mt-1 block truncate text-sm font-semibold">{ticket.subject}</span><span className="mt-1 block text-xs text-slate-500">{ticketCategoryLabel(ticket)} · {ticket.userName}</span><span className="mt-1 block text-[11px] text-slate-400">{dateLabel(ticket.createdAt)}</span></button></li>)}</ul>
       </section>
 
       {selected && <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4 dark:border-slate-800"><div><p className="font-mono text-xs font-bold text-primary">{selected.ticketCode}</p><h2 className="mt-1 text-xl font-bold">{selected.subject}</h2><p className="mt-1 text-sm text-slate-500">{categoryLabels[selected.category]} · {dateLabel(selected.createdAt)} · Tiếp nhận bởi {selected.receiverUnit === 'admin' ? 'Admin' : 'Giáo vụ'}</p></div><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold dark:bg-slate-800">{statusLabels[selected.status]}</span></div>
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4 dark:border-slate-800"><div><p className="font-mono text-xs font-bold text-primary">{selected.ticketCode}</p><h2 className="mt-1 text-xl font-bold">{selected.subject}</h2><p className="mt-1 text-sm text-slate-500">{ticketCategoryLabel(selected)} · {dateLabel(selected.createdAt)} · Tiếp nhận bởi {selected.receiverUnit === 'admin' ? 'Admin' : 'Giáo vụ'}</p></div><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold dark:bg-slate-800">{statusLabels[selected.status]}</span></div>
         <dl className="grid gap-x-4 gap-y-1 border-b border-slate-100 py-3 text-sm dark:border-slate-800 sm:grid-cols-2"><dt className="text-slate-500">Người gửi</dt><dd>{selected.userName}</dd><dt className="text-slate-500">Mã người gửi</dt><dd>{selected.userCode}</dd><dt className="text-slate-500">Email</dt><dd className="break-all">{selected.email || '—'}</dd><dt className="text-slate-500">Lớp / đơn vị</dt><dd>{selected.classNameOrDept || '—'}</dd></dl>
         <div className="py-4"><h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Nội dung yêu cầu</h3><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{selected.content}</p></div>
         {selected.appealScores && <div className="mb-4 rounded-xl bg-amber-50 p-3 dark:bg-amber-950/30"><p className="text-sm font-semibold">Điểm tại thời điểm gửi · {selected.appealSectionId}</p><p className="mt-1 text-sm">Chuyên cần {selected.appealScores.attendance ?? '—'} · Giữa kỳ {selected.appealScores.midterm ?? '—'} · Cuối kỳ {selected.appealScores.exam ?? '—'} · Tổng kết {selected.appealScores.final} ({selected.appealScores.letter})</p></div>}

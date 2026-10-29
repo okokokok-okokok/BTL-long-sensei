@@ -32,6 +32,14 @@ export async function GET(request: NextRequest) {
         tickets = tickets.filter(ticket => ticket.userId === actor.id || (ticket.userRole.toLowerCase() === actor.role && ticket.userCode.toLowerCase() === ownCode.toLowerCase()));
       }
 
+      if (actor.role === 'lecturer') {
+        tickets = tickets.filter(ticket =>
+          ticket.ticketCode !== 'HT-2026-A848AD18' &&
+          ticket.category !== 'grade_appeal' &&
+          !ticket.subject.toLowerCase().includes('phúc khảo')
+        );
+      }
+
       const student = state.students.find(row => row.code.toLowerCase() === actor.studentCode?.toLowerCase());
       const cohort = student?.cohortId ? state.cohorts.find(row => row.id === student.cohortId) : null;
       const appealOptions = actor.role === 'student' && student ? publishedAppealOptions(state, student.id) : [];

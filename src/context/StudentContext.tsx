@@ -1,6 +1,7 @@
 'use client';
 
 import { apiFetch } from '@/lib/apiFetch';
+import { onPortalChanged } from '@/lib/portal-client-events';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { StudentProfile } from '@/types/student';
@@ -40,6 +41,10 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setCurrentStudent(emptyProfile); setError(null);
     if (user?.role === 'student' && user.studentCode) {
       loadStudent(user.studentCode);
+      const unsubscribe = onPortalChanged(() => {
+        if (user?.studentCode) void loadStudent(user.studentCode);
+      });
+      return () => unsubscribe();
     }
   }, [user?.id, user?.role, user?.studentCode]);
 

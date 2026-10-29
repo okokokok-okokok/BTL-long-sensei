@@ -8,7 +8,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';
 import { SupportModal } from '@/components/SupportModal';
-import { ChatbotWidget } from '@/components/ChatbotWidget';
+
 import { AnnouncementToast } from '@/components/AnnouncementToast';
 
 function lecturerRouteAllowed(pathname: string) {
@@ -137,7 +137,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       )}
 
       {/* Chatbot AI Assistant (Góc phải màn hình, chỉ xuất hiện sau khi đăng nhập) */}
-      <ChatbotWidget isLoginPage={false} />
+
 
       {/* Real-time Announcement Toast (Báo tin mới từ giaovu.ptit.edu.vn) */}
       <AnnouncementToast />
