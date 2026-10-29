@@ -1,0 +1,47 @@
+export const demoAdditionalCohorts = [
+  { id: 'cohort-D24CQCN01-B', code: 'D24CQCN01-B', name: 'D24CQCN01-B', major: 'Công nghệ thông tin', faculty: 'Khoa Công nghệ thông tin 1', startYear: 2024, endYear: 2028, active: true },
+  { id: 'cohort-D24CQAT01-B', code: 'D24CQAT01-B', name: 'D24CQAT01-B', major: 'An toàn thông tin', faculty: 'Khoa An toàn thông tin', startYear: 2024, endYear: 2028, active: true },
+];
+
+const students = [
+  ['B24DCCN001', 'Nguyễn Phương Anh', 'D24CQCN01-B', 'Công nghệ thông tin', 'Khoa Công nghệ thông tin 1', 3.42, 3.57, 39],
+  ['B24DCCN002', 'Trần Minh Anh', 'D24CQCN01-B', 'Công nghệ thông tin', 'Khoa Công nghệ thông tin 1', 3.18, 3.38, 36],
+  ['B24DCCN003', 'Lê Hoàng Bách', 'D24CQCN01-B', 'Công nghệ thông tin', 'Khoa Công nghệ thông tin 1', 3.61, 3.76, 42],
+  ['B24DCCN004', 'Phạm Gia Bảo', 'D24CQCN01-B', 'Công nghệ thông tin', 'Khoa Công nghệ thông tin 1', 2.94, 3.19, 34],
+  ['B24DCCN005', 'Vũ Khánh Chi', 'D24CQCN01-B', 'Công nghệ thông tin', 'Khoa Công nghệ thông tin 1', 3.77, 3.92, 45],
+  ['B24DCCN006', 'Đỗ Minh Đức', 'D24CQCN01-B', 'Công nghệ thông tin', 'Khoa Công nghệ thông tin 1', 3.05, 3.25, 36],
+  ['B24DCCN007', 'Nguyễn Thu Hà', 'D24CQCN01-B', 'Công nghệ thông tin', 'Khoa Công nghệ thông tin 1', 3.36, 3.56, 38],
+  ['B24DCCN008', 'Hoàng Anh Khoa', 'D24CQCN01-B', 'Công nghệ thông tin', 'Khoa Công nghệ thông tin 1', 2.82, 3.07, 33],
+  ['B24DCCN009', 'Bùi Quang Minh', 'D24CQCN01-B', 'Công nghệ thông tin', 'Khoa Công nghệ thông tin 1', 3.49, 3.69, 40],
+  ['B24DCCN010', 'Phan Ngọc Nam', 'D24CQCN01-B', 'Công nghệ thông tin', 'Khoa Công nghệ thông tin 1', 3.11, 3.31, 36],
+  ['B24DCCN011', 'Trần Thanh Tâm', 'D24CQCN01-B', 'Công nghệ thông tin', 'Khoa Công nghệ thông tin 1', 3.68, 3.83, 43],
+  ['B24DCCN012', 'Lê Minh Tú', 'D24CQCN01-B', 'Công nghệ thông tin', 'Khoa Công nghệ thông tin 1', 3.27, 3.47, 37],
+  ['B24DCAT001', 'Đặng Hoàng An', 'D24CQAT01-B', 'An toàn thông tin', 'Khoa An toàn thông tin', 3.24, 3.44, 37],
+  ['B24DCAT002', 'Nguyễn Đức Bình', 'D24CQAT01-B', 'An toàn thông tin', 'Khoa An toàn thông tin', 3.51, 3.71, 41],
+  ['B24DCAT003', 'Lý Mai Chi', 'D24CQAT01-B', 'An toàn thông tin', 'Khoa An toàn thông tin', 3.83, 3.98, 46],
+  ['B24DCAT004', 'Trần Hải Đăng', 'D24CQAT01-B', 'An toàn thông tin', 'Khoa An toàn thông tin', 2.76, 3.01, 32],
+  ['B24DCAT005', 'Phạm Thu Giang', 'D24CQAT01-B', 'An toàn thông tin', 'Khoa An toàn thông tin', 3.43, 3.63, 39],
+  ['B24DCAT006', 'Vũ Hồng Hạnh', 'D24CQAT01-B', 'An toàn thông tin', 'Khoa An toàn thông tin', 3.09, 3.29, 35],
+  ['B24DCAT007', 'Nguyễn Mạnh Hùng', 'D24CQAT01-B', 'An toàn thông tin', 'Khoa An toàn thông tin', 3.32, 3.52, 38],
+  ['B24DCAT008', 'Đỗ Ngọc Linh', 'D24CQAT01-B', 'An toàn thông tin', 'Khoa An toàn thông tin', 3.72, 3.87, 44],
+  ['B24DCAT009', 'Bùi Khánh Ngọc', 'D24CQAT01-B', 'An toàn thông tin', 'Khoa An toàn thông tin', 3.15, 3.35, 36],
+  ['B24DCAT010', 'Trương Thanh Phong', 'D24CQAT01-B', 'An toàn thông tin', 'Khoa An toàn thông tin', 2.91, 3.16, 34],
+  ['B24DCAT011', 'Hoàng Minh Quân', 'D24CQAT01-B', 'An toàn thông tin', 'Khoa An toàn thông tin', 3.58, 3.73, 42],
+  ['B24DCAT012', 'Phan Hải Yến', 'D24CQAT01-B', 'An toàn thông tin', 'Khoa An toàn thông tin', 3.64, 3.79, 43],
+] as const;
+
+export const demoAdditionalStudents = students.map(([studentCode, name, className, major, faculty, cumulativeGpa, targetGpa, earnedCredits]) => ({
+  id: `std-${studentCode.toLowerCase()}`,
+  studentCode,
+  name,
+  email: `${studentCode.toLowerCase()}@stu.ptit.edu.vn`,
+  avatarUrl: '/default-avatar.png',
+  major,
+  className,
+  faculty,
+  academicYear: '2024 - 2028',
+  cumulativeGpa,
+  targetGpa,
+  earnedCredits,
+  requiredCredits: 140,
+}));

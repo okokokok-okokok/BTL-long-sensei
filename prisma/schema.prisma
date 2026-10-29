@@ -1,0 +1,279 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Student {
+  id              String   @id @default(uuid())
+  studentCode     String   @unique @map("student_code")
+  name            String
+  email           String   @unique
+  avatarUrl       String?  @map("avatar_url")
+  major           String
+  className       String   @map("class_name")
+  faculty         String
+  academicYear    String   @map("academic_year")
+  cumulativeGpa   Float    @default(0.0) @map("cumulative_gpa")
+  targetGpa       Float    @default(3.50) @map("target_gpa")
+  earnedCredits   Int      @default(0) @map("earned_credits")
+  requiredCredits Int      @default(140) @map("required_credits")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  grades Grade[]
+
+  @@map("students")
+}
+
+model Course {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  credits     Int
+  instructor  String
+  department  String
+  schedule    String
+  room        String
+  enrolled    Int      @default(0)
+  capacity    Int      @default(50)
+  status      String   @default("open")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  grades Grade[]
+
+  @@map("courses")
+}
+
+model Grade {
+  id              String   @id @default(uuid())
+  studentId       String   @map("student_id")
+  courseId        String   @map("course_id")
+  attendanceGrade Float    @default(0.0) @map("attendance_grade")
+  midtermGrade    Float    @default(0.0) @map("midterm_grade")
+  examGrade       Float    @default(0.0) @map("exam_grade")
+  finalGrade      Float    @default(0.0) @map("final_grade")
+  letterGrade     String   @map("letter_grade")
+  semester        String
+  status          String   @default("passed")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("grades")
+}
+
+model Announcement {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  isUrgent  Boolean  @default(false) @map("is_urgent")
+  timeAgo   String   @map("time_ago")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("announcements")
+}
+
+// Normalized academic portal. Legacy models above remain intact.
+
+model PortalUser {
+  id String @id @default(uuid())
+  username String @unique
+  name String 
+  email String @unique
+  role String 
+  passwordHash String 
+  active Boolean @default(true)
+  studentCode String? @unique
+  lecturerCode String? @unique
+  department String @default("")
+  faculty String @default("")
+  avatarUrl String @default("/default-avatar.png")
+  sections PortalSection[]
+  @@map("portal_users")
+}
+
+model PortalCohort {
+  id String @id @default(uuid())
+  code String @unique
+  name String 
+  major String 
+  faculty String 
+  startYear Int 
+  endYear Int 
+  active Boolean @default(true)
+  students PortalStudent[]
+  @@map("portal_cohorts")
+}
+
+model PortalStudent {
+  id String @id @default(uuid())
+  code String @unique
+  name String 
+  email String @unique
+  cohortId String? 
+  major String 
+  faculty String 
+  academicYear String 
+  degreeSystem String @default("")
+  curriculumId String?
+  phone String @default("")
+  address String @default("")
+  dateOfBirth String @default("")
+  avatarUrl String @default("/default-avatar.png")
+  active Boolean @default(true)
+  legacyGpa Float @default(0)
+  legacyCredits Int @default(0)
+  targetGpa Float @default(3.5)
+  requiredCredits Int @default(140)
+  @@index([cohortId])
+  cohort PortalCohort? @relation(fields: [cohortId], references: [id], onDelete: Restrict)
+  enrollments PortalEnrollment[]
+  curriculumAssignments PortalCurriculumAssignment[]
+  @@map("portal_students")
+}
+
+model PortalSubject {
+  id String @id @default(uuid())
+  code String @unique
+  name String 
+  credits Int 
+  department String 
+  active Boolean @default(true)
+  sections PortalSection[]
+  @@map("portal_subjects")
+}
+
+model PortalSection {
+  id String @id @default(uuid())
+  code String @unique
+  subjectId String 
+  semester String 
+  lecturerId String? 
+  capacity Int @default(50)
+  status String @default("draft")
+  gradesLocked Boolean @default(false)
+  registrationStart String @default("")
+  registrationEnd String @default("")
+  @@index([subjectId])
+  @@index([lecturerId])
+  subject PortalSubject @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  lecturer PortalUser? @relation(fields: [lecturerId], references: [id], onDelete: Restrict)
+  meetings PortalMeeting[]
+  enrollments PortalEnrollment[]
+  @@map("portal_sections")
+}
+
+model PortalMeeting {
+  id String @id @default(uuid())
+  sectionId String 
+  day Int 
+  startPeriod Int 
+  endPeriod Int 
+  startDate String 
+  endDate String 
+  room String 
+  @@index([sectionId])
+  section PortalSection @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  @@map("portal_meetings")
+}
+
+model PortalEnrollment {
+  id String @id @default(uuid())
+  sectionId String 
+  studentId String 
+  status String @default("registered")
+  registeredAt String 
+  @@index([sectionId])
+  @@index([studentId])
+  section PortalSection @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  student PortalStudent @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  result PortalResult?
+  @@unique([sectionId, studentId])
+  @@map("portal_enrollments")
+}
+
+model PortalResult {
+  id String @id @default(uuid())
+  enrollmentId String @unique
+  attendance Float? 
+  midterm Float? 
+  exam Float? 
+  published Boolean @default(false)
+  updatedAt String 
+  @@index([enrollmentId])
+  enrollment PortalEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  @@map("portal_results")
+}
+
+model PortalAudit {
+  id String @id @default(uuid())
+  actorId String 
+  actorName String 
+  action String 
+  entityId String 
+  createdAt String 
+  @@index([actorId])
+  @@index([entityId])
+  @@index([createdAt])
+  @@map("portal_audits")
+}
+
+model PortalCurriculumProgram {
+  id String @id
+  code String @unique
+  name String
+  active Boolean @default(true)
+  versions PortalCurriculumVersion[]
+  @@map("portal_curriculum_programs")
+}
+
+model PortalCurriculumVersion {
+  id String @id
+  programId String
+  version String
+  faculty String
+  major String
+  degreeSystem String
+  intakeStartYear Int
+  intakeEndYear Int
+  planStartYear Int
+  status String @default("draft")
+  totalCreditsRequired Int
+  trainingTime String @default("")
+  terms Json
+  electiveGroups Json
+  courses Json
+  createdAt String
+  updatedAt String
+  publishedAt String @default("")
+  @@unique([programId, version])
+  @@index([faculty, major, degreeSystem, intakeStartYear, intakeEndYear])
+  @@index([status])
+  program PortalCurriculumProgram @relation(fields: [programId], references: [id], onDelete: Restrict)
+  @@map("portal_curriculum_versions")
+}
+
+model PortalCurriculumAssignment {
+  id String @id
+  studentId String
+  oldVersionId String?
+  newVersionId String?
+  reason String @default("")
+  actorId String
+  actorName String
+  createdAt String
+  @@index([studentId, createdAt])
+  student PortalStudent @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  @@map("portal_curriculum_assignments")
+}
+
+model PortalMeta {
+  id String @id
+  value String
+  @@map("portal_meta")
+}
