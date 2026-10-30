@@ -10,7 +10,7 @@ import { importLegacyDemoCurricula } from './curricula';
 
 // Local demo only. A real database imports existing rows instead (scripts/portal-migrate.ts).
 export function createDemoState(): PortalState {
-  const state: PortalState = { users: [], cohorts: [], students: [], subjects: [], sections: [], meetings: [], enrollments: [], results: [], audits: [], supportTickets: [], catalogs: [], lecturers: [], curriculumPrograms: [], curriculumVersions: [], curriculumAssignments: [] };
+  const state: PortalState = { users: [], cohorts: [], students: [], subjects: [], sections: [], meetings: [], enrollments: [], results: [], gradeReconciliations: [], audits: [], supportTickets: [], catalogs: [], lecturers: [], curriculumPrograms: [], curriculumVersions: [], curriculumAssignments: [] };
   state.users = ALL_SYSTEM_USERS.map(u => ({
     id: u.id, username: u.username, name: u.name, email: u.email, role: u.role,
     passwordHash: hashPassword(u.password), active: true, studentCode: u.studentCode || null,

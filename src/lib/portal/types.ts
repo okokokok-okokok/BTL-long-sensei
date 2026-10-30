@@ -22,7 +22,9 @@ export interface Subject {
 export interface Section {
   id: string; code: string; subjectId: string; semester: string; lecturerId: string | null;
   capacity: number; status: 'draft' | 'open' | 'closed'; gradesLocked: boolean;
-  registrationStart: string; registrationEnd: string;
+  registrationStart: string; registrationEnd: string; allowCrossProgram?: boolean; outsideCurriculum?: boolean;
+  gradeWorkflowEnabled?: boolean; componentGradesPublishedAt?: string; componentReviewDeadline?: string;
+  componentsTransferredAt?: string; componentsTransferredById?: string | null; componentsTransferredByName?: string;
 }
 export interface Meeting {
   id: string; sectionId: string; day: number; startPeriod: number; endPeriod: number;
@@ -33,7 +35,12 @@ export interface Enrollment {
 }
 export interface Result {
   id: string; enrollmentId: string; attendance: number | null; midterm: number | null;
-  exam: number | null; published: boolean; updatedAt: string;
+  exam: number | null; published: boolean; publishedAt?: string; updatedAt: string;
+}
+export interface GradeReconciliation {
+  id: string; sectionId: string; enrollmentId: string; studentId: string; message: string;
+  status: 'open' | 'resolved'; resolution: string; createdAt: string; updatedAt: string;
+  resolvedAt: string | null; resolvedById: string | null; resolvedByName: string;
 }
 export interface Audit {
   id: string; actorId: string; actorName: string; action: string; entityId: string; createdAt: string;
@@ -68,7 +75,7 @@ export interface Lecturer {
 export interface PortalState {
   users: PortalUser[]; cohorts: Cohort[]; students: Student[]; subjects: Subject[];
   sections: Section[]; meetings: Meeting[]; enrollments: Enrollment[]; results: Result[]; audits: Audit[];
-  supportTickets: SupportRequest[];
+  supportTickets: SupportRequest[]; gradeReconciliations: GradeReconciliation[];
   catalogs: CatalogEntry[]; lecturers: Lecturer[];
   curriculumPrograms: CurriculumProgram[]; curriculumVersions: CurriculumVersion[]; curriculumAssignments: CurriculumAssignment[];
 }

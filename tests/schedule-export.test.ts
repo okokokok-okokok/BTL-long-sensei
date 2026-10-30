@@ -24,7 +24,7 @@ function fixture(): PortalState {
       { id: 'enrolled', sectionId: 'section-1', studentId: 'student-1', status: 'registered', registeredAt: '2026-09-01T00:00:00.000Z' },
       { id: 'cancelled', sectionId: 'section-1', studentId: 'student-1', status: 'cancelled', registeredAt: '2026-09-01T00:00:00.000Z' },
     ],
-    results: [], audits: [], supportTickets: [], catalogs: [],
+    results: [], gradeReconciliations: [], audits: [], supportTickets: [], catalogs: [],
     lecturers: [
       { id: 'profile-1', code: 'GV01', name: '=HYPERLINK("https://bad")', email: 'gv1@ptit.edu.vn', faculty: 'Khoa CNTT', department: 'Bộ môn Mạng', active: true },
       { id: 'profile-2', code: 'GV02', name: 'Giảng viên không có lịch', email: 'gv2@ptit.edu.vn', faculty: 'Khoa Cơ bản', department: 'Bộ môn Toán', active: true },
@@ -117,6 +117,6 @@ test('current room filters apply to each meeting, and empty exports report no da
   });
   assert.deepEqual(report.scheduleRows.map(row => row.date), ['2026-10-28']);
   await assert.rejects(() => createScheduleWorkbook({
-    users: [], cohorts: [], students: [], subjects: [], sections: [], meetings: [], enrollments: [], results: [], audits: [], supportTickets: [], catalogs: [], lecturers: [], curriculumPrograms: [], curriculumVersions: [], curriculumAssignments: [],
+    users: [], cohorts: [], students: [], subjects: [], sections: [], meetings: [], enrollments: [], results: [], gradeReconciliations: [], audits: [], supportTickets: [], catalogs: [], lecturers: [], curriculumPrograms: [], curriculumVersions: [], curriculumAssignments: [],
   }, { scope: 'week', startDate: '2026-10-26', endDate: '2026-11-01' }), /Không có buổi học hoặc giảng viên/);
 });

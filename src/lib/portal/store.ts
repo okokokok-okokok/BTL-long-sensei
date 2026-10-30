@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import lockfile from 'proper-lockfile';
 import { PrismaClient, Prisma } from '@prisma/client';
+import { Pool } from 'pg';
 import type { PortalState } from './types';
 import { createDemoState } from './seed';
 import { PortalError } from './domain';
@@ -9,23 +10,34 @@ import { ensureDirectories } from './directories';
 import { importLegacyDemoCurricula } from './curricula';
 import { purgeInvalidLecturerTickets } from './support';
 
-export const collections = ['catalogs', 'lecturers', 'curriculumPrograms', 'curriculumVersions', 'users', 'cohorts', 'students', 'subjects', 'sections', 'meetings', 'enrollments', 'results', 'audits', 'supportTickets', 'curriculumAssignments'] as const;
+export const collections = ['catalogs', 'lecturers', 'curriculumPrograms', 'curriculumVersions', 'users', 'cohorts', 'students', 'subjects', 'sections', 'meetings', 'enrollments', 'results', 'gradeReconciliations', 'audits', 'supportTickets', 'curriculumAssignments'] as const;
 const tableNames: Record<typeof collections[number], string> = {
   users: 'portal_users', cohorts: 'portal_cohorts', students: 'portal_students', subjects: 'portal_subjects',
   sections: 'portal_sections', meetings: 'portal_meetings', enrollments: 'portal_enrollments',
-  results: 'portal_results', audits: 'portal_audits', supportTickets: 'portal_support_tickets',
+  results: 'portal_results', gradeReconciliations: 'portal_grade_reconciliations', audits: 'portal_audits', supportTickets: 'portal_support_tickets',
   catalogs: 'portal_catalogs', lecturers: 'portal_lecturers',
   curriculumPrograms: 'portal_curriculum_programs', curriculumVersions: 'portal_curriculum_versions', curriculumAssignments: 'portal_curriculum_assignments',
 };
 export interface Queryable { query(sql: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }> }
 export function emptyState(): PortalState {
-  return { users: [], cohorts: [], students: [], subjects: [], sections: [], meetings: [], enrollments: [], results: [], audits: [], supportTickets: [], catalogs: [], lecturers: [], curriculumPrograms: [], curriculumVersions: [], curriculumAssignments: [] };
+  return { users: [], cohorts: [], students: [], subjects: [], sections: [], meetings: [], enrollments: [], results: [], gradeReconciliations: [], audits: [], supportTickets: [], catalogs: [], lecturers: [], curriculumPrograms: [], curriculumVersions: [], curriculumAssignments: [] };
 }
 export async function loadState(db: Queryable): Promise<PortalState> {
   const state = emptyState();
   for (const key of collections) {
     const { rows } = await db.query(`SELECT * FROM ${tableNames[key]} ORDER BY id`);
     (state[key] as unknown[]) = rows;
+  }
+  return state;
+}
+const snapshotSql = `SELECT ${collections.map(key => `(SELECT COALESCE(json_agg(row ORDER BY row.id), '[]'::json) FROM ${tableNames[key]} AS row) AS "${key}"`).join(', ')}`;
+export async function loadStateSnapshot(db: Queryable): Promise<PortalState> {
+  const { rows } = await db.query(snapshotSql);
+  const record = rows[0];
+  const state = emptyState();
+  for (const key of collections) {
+    if (!Array.isArray(record?.[key])) throw new Error(`Không đọc được bảng ${tableNames[key]}.`);
+    (state[key] as unknown[]) = record[key] as unknown[];
   }
   return state;
 }
@@ -59,10 +71,20 @@ export function storageMode(): 'postgresql' | 'demo' {
   if (process.env.NODE_ENV === 'production') throw new PortalError('Cần cấu hình DATABASE_URL, hoặc PORTAL_STORAGE=demo để chạy bản trình diễn.', 503);
   return 'demo';
 }
-const globalDb = globalThis as unknown as { portalPrisma?: PrismaClient };
+const globalDb = globalThis as unknown as { portalPrisma?: PrismaClient; portalReadPool?: Pool; portalReadUrl?: string };
 function client() {
   if (!globalDb.portalPrisma) globalDb.portalPrisma = new PrismaClient();
   return globalDb.portalPrisma;
+}
+function readPool() {
+  const url = process.env.DATABASE_URL!;
+  if (!globalDb.portalReadPool || globalDb.portalReadUrl !== url) {
+    if (globalDb.portalReadPool) void globalDb.portalReadPool.end().catch(() => {});
+    globalDb.portalReadPool = new Pool({ connectionString: url, max: 5, connectionTimeoutMillis: 10000, idleTimeoutMillis: 30000 });
+    globalDb.portalReadPool.on('error', error => console.error('Portal read pool error:', error.name));
+    globalDb.portalReadUrl = url;
+  }
+  return globalDb.portalReadPool;
 }
 export function prismaAdapter(tx: Prisma.TransactionClient): Queryable {
   return { query: async (sql, values = []) => {
@@ -85,6 +107,16 @@ export async function withState<T>(write: boolean, fn: (state: PortalState) => T
       return await fn(structuredClone(pgCache.state));
     }
     try {
+      if (!write) {
+        // This one SQL statement sees a consistent PostgreSQL snapshot and avoids
+        // fifteen network round trips for every read-only request.
+        const state = await loadStateSnapshot({ query: async sql => ({ rows: (await readPool().query(sql)).rows }) });
+        ensureDirectories(state, process.env.PORTAL_CURRENT_SEMESTER);
+        purgeInvalidLecturerTickets(state);
+        const value = await fn(state);
+        pgCache = { state: structuredClone(state), timestamp: Date.now() };
+        return value;
+      }
       return await client().$transaction(async tx => {
         const db = prismaAdapter(tx);
         if (write) await tx.$queryRawUnsafe('SELECT 1 AS locked FROM pg_advisory_xact_lock(72402517)');

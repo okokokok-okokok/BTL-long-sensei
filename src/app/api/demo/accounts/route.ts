@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
-import { storageMode, withState } from '@/lib/portal/store';
+import { withState } from '@/lib/portal/store';
 import { checkPassword } from '@/lib/portal/password';
 import { apiError } from '@/lib/portal/session';
 
 export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
-    if (storageMode() !== 'demo') return NextResponse.json({ enabled: false, accounts: [] });
+    // Demo credentials are only shown by the local development server. Even when
+    // local data is stored in PostgreSQL, expose a preset password only after its
+    // hash matches the actual active account. Never publish this list in production.
+    if (process.env.NODE_ENV === 'production') return NextResponse.json({ enabled: false, accounts: [] });
     const presets = [
       { username: 'admin@ptit', password: 'ptitcstranphu@123', label: 'Admin' },
       { username: 'giaovu@ptit', password: 'giaovu@123', label: 'Giáo vụ' },

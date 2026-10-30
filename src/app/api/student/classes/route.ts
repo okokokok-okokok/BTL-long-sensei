@@ -38,8 +38,7 @@ export async function GET(request: NextRequest) {
         const selected = matchingChoice?.value || calendar.defaultSemester;
         const sections = state.sections.filter(row => {
           if (!ownSectionIds.has(row.id) || !selected || !sameSemester(row.semester, selected, state.catalogs)) return false;
-          const subject = state.subjects.find(item => item.id === row.subjectId);
-          return !curriculumCodes || (!!subject && curriculumCodes.has(subject.code.toUpperCase()));
+          return true;
         }).map(section => {
           const subject = state.subjects.find(row => row.id === section.subjectId);
           const lecturer = state.users.find(row => row.id === section.lecturerId);
@@ -49,15 +48,12 @@ export async function GET(request: NextRequest) {
             startDate: meeting.startDate, endDate: meeting.endDate,
           }));
           return { id: section.id, code: section.code, semester: section.semester, subjectCode: subject?.code || '', subjectName: subject?.name || '', credits: subject?.credits || 0,
-            lecturerName: lecturer?.name || 'Chưa phân công', enrollmentCount: state.enrollments.filter(row => row.sectionId === section.id && row.status === 'registered').length,
+            lecturerName: lecturer?.name || 'Chưa phân công', outsideCurriculum: !curriculumCodes || !subject || !curriculumCodes.has(subject.code.toUpperCase()), enrollmentCount: state.enrollments.filter(row => row.sectionId === section.id && row.status === 'registered').length,
             capacity: section.capacity, meetings };
         });
         const sectionId = params.get('sectionId');
         if (sectionId) {
           if (!ownSectionIds.has(sectionId)) throw new PortalError('Chỉ xem được danh sách lớp tín chỉ bạn đang đăng ký.', 403);
-          const rosterSection = state.sections.find(row => row.id === sectionId);
-          const rosterSubject = rosterSection && state.subjects.find(row => row.id === rosterSection.subjectId);
-          if (curriculumCodes && (!rosterSubject || !curriculumCodes.has(rosterSubject.code.toUpperCase()))) throw new PortalError('Môn học không thuộc chương trình đào tạo của bạn.', 403);
           const peers = state.enrollments.filter(row => row.sectionId === sectionId && row.status === 'registered').flatMap(enrollment => {
             const peer = state.students.find(row => row.id === enrollment.studentId);
             return peer ? [{ code: peer.code, name: peer.name, avatarUrl: peer.avatarUrl || '' }] : [];

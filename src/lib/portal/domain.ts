@@ -11,6 +11,8 @@ import { academicSelection, catalogEqual, catalogReferenced, cohortMatches, ensu
 import { PortalError } from './errors';
 import { accountProfile, saveDirectory } from './directory-mutations';
 import { configuredCurrentSemester, todayInVietnam } from './academic-dashboard';
+import { compareSemesters } from './semester';
+import { officialAppealDeadline } from './grade-workflow';
 export { PortalError } from './errors';
 export { gradeSummary, studentSummary } from './analytics';
 
@@ -154,7 +156,13 @@ function editableSection(state: PortalState, actor: Actor, sectionId: unknown) {
   if (section.gradesLocked) throw new PortalError('Bảng điểm đã khóa. Giáo vụ phải mở khóa trước khi sửa.', 409);
   return section;
 }
-
+function gradeScore(value: unknown) {
+  if (value === null || value === '' || value === undefined) return null;
+  if (typeof value !== 'number' && typeof value !== 'string') throw new PortalError('Điểm không hợp lệ.');
+  const score = Number(value);
+  if (!Number.isFinite(score) || score < 0 || score > 10) throw new PortalError('Điểm phải trong khoảng 0 đến 10.');
+  return Math.round(score * 100) / 100;
+}
 // Called within one database/file transaction. No partially applied mutation is persisted.
 export function mutate(state: PortalState, actor: Actor, action: string, b: Record<string, unknown>) {
   ensureDirectories(state);
@@ -220,7 +228,9 @@ export function mutate(state: PortalState, actor: Actor, action: string, b: Reco
     case 'catalog.delete': {
       requireRole(actor, ['admin', 'academic']);
       const row = get(state.catalogs, b.id, 'danh mục');
-      if (row.kind === 'intake' || row.kind === 'semester') throw new PortalError('Khóa tuyển sinh và học kỳ được bổ sung từ cấu hình chung. Hãy ngừng hoạt động mục không dùng.', 409);
+      if (row.kind === 'intake') throw new PortalError('Khóa tuyển sinh được giữ trong danh mục để bảo toàn lịch sử. Hãy ngừng hoạt động mục không dùng.', 409);
+      if (row.kind === 'semester' && compareSemesters(row.name, configuredCurrentSemester(), state.catalogs) >= 0) throw new PortalError('Chỉ xóa được học kỳ trước học kỳ hiện tại. Học kỳ hiện tại hoặc tương lai có thể được ngừng hoạt động.', 409);
+      if (row.kind === 'semester' && catalogReferenced(state, row)) throw new PortalError('Không thể xóa học kỳ đã được lớp tín chỉ tham chiếu. Hãy ngừng hoạt động để giữ lịch sử.', 409);
       if (catalogReferenced(state, row) || state.curriculumVersions.some(version =>
         row.kind === 'faculty' && catalogEqual('faculty', version.faculty, row.name, state.catalogs)
         || row.kind === 'major' && catalogEqual('major', version.major, row.name, state.catalogs)
@@ -231,7 +241,7 @@ export function mutate(state: PortalState, actor: Actor, action: string, b: Reco
     case 'curriculum.draft.delete': {
       requireRole(actor, ['admin', 'academic']);
       const row = get(state.curriculumVersions, b.id, 'bản nháp chương trình');
-      if (row.status !== 'draft') throw new PortalError('Chỉ xóa được bản nháp; phiên bản đã công bố cần ngừng áp dụng.', 409);
+      if (row.status !== 'draft') throw new PortalError('Chỉ xóa được bản nháp; chương trình đã công bố cần ngừng áp dụng.', 409);
       if (state.students.some(item => item.curriculumId === row.id) || state.curriculumAssignments.some(item => item.oldVersionId === row.id || item.newVersionId === row.id)) throw new PortalError('Bản nháp có dữ liệu tham chiếu; không thể xóa.', 409);
       const programCode = state.curriculumPrograms.find(item => item.id === row.programId)?.code || row.programId;
       state.curriculumVersions = state.curriculumVersions.filter(item => item.id !== row.id);
@@ -247,60 +257,60 @@ export function mutate(state: PortalState, actor: Actor, action: string, b: Reco
       const program: CurriculumProgram = { id: randomUUID(), code: programCode, name: text(b.name, 'tên chương trình', true, 200), active: true };
       const stamp = new Date().toISOString();
       const scope = curriculumScope(state, b);
-      const rawVersion = text(b.version, 'phiên bản', true, 40);
-      if (state.curriculumVersions.some(row => row.programId === program.id && row.version === rawVersion)) throw new PortalError('Phiên bản chương trình đã tồn tại.', 409);
+      const rawVersion = text(b.version, 'mã bản chương trình', true, 40);
+      if (state.curriculumVersions.some(row => row.programId === program.id && row.version === rawVersion)) throw new PortalError('Bản chương trình này đã tồn tại.', 409);
       const version: CurriculumVersion = { id: randomUUID(), programId: program.id, version: rawVersion, ...scope, planStartYear: integer(b.planStartYear, 'Năm bắt đầu kế hoạch', 1990, 2110), status: 'draft', totalCreditsRequired: integer(b.totalCreditsRequired, 'Tổng tín chỉ yêu cầu', 1, 500), trainingTime: text(b.trainingTime, 'Thời gian đào tạo', false, 100), terms: [], electiveGroups: [], courses: [], createdAt: stamp, updatedAt: stamp, publishedAt: '' };
       state.curriculumPrograms.push(program); state.curriculumVersions.push(version); entityId = version.id; break;
     }
     case 'curriculum.version.create': {
       requireRole(actor, ['admin', 'academic']);
-      const source = get(state.curriculumVersions, b.sourceVersionId, 'phiên bản chương trình');
-      if (source.status === 'draft') throw new PortalError('Chỉ tạo phiên bản mới từ chương trình đã áp dụng hoặc ngừng áp dụng.');
-      const versionName = text(b.version, 'phiên bản mới', true, 40);
-      if (state.curriculumVersions.some(row => row.programId === source.programId && row.version === versionName)) throw new PortalError('Phiên bản chương trình đã tồn tại.', 409);
+      const source = get(state.curriculumVersions, b.sourceVersionId, 'chương trình đào tạo');
+      if (source.status === 'draft') throw new PortalError('Chỉ tạo bản mới từ chương trình đã áp dụng hoặc ngừng áp dụng.');
+      const versionName = text(b.version, 'mã bản chương trình mới', true, 40);
+      if (state.curriculumVersions.some(row => row.programId === source.programId && row.version === versionName)) throw new PortalError('Bản chương trình này đã tồn tại.', 409);
       const version = copyCurriculumVersion(source, randomUUID(), versionName);
       state.curriculumVersions.push(version); entityId = version.id; break;
     }
     case 'curriculum.draft.save': {
       requireRole(actor, ['admin', 'academic']);
-      const old = get(state.curriculumVersions, b.id, 'phiên bản chương trình');
-      if (old.status !== 'draft') throw new PortalError('Chỉ chỉnh sửa được bản nháp. Hãy tạo phiên bản mới để thay đổi chương trình đã công bố.', 409);
+      const old = get(state.curriculumVersions, b.id, 'chương trình đào tạo');
+      if (old.status !== 'draft') throw new PortalError('Chỉ chỉnh sửa được bản nháp. Hãy tạo bản mới để thay đổi chương trình đã công bố.', 409);
       const program = get(state.curriculumPrograms, old.programId, 'chương trình đào tạo');
       const programCode = code(b.programCode || program.code);
       unique(state.curriculumPrograms, program.id, row => row.code.toUpperCase() === programCode, 'Mã chương trình');
       const hasPublishedSibling = state.curriculumVersions.some(row => row.programId === program.id && row.id !== old.id && row.status !== 'draft');
       const programName = text(b.programName || program.name, 'tên chương trình', true, 200);
-      if (hasPublishedSibling && (programCode !== program.code || programName !== program.name)) throw new PortalError('Chương trình đã có phiên bản áp dụng; không sửa mã hoặc tên dùng chung để bảo toàn lịch sử.', 409);
+      if (hasPublishedSibling && (programCode !== program.code || programName !== program.name)) throw new PortalError('Chương trình đã được áp dụng; không sửa mã hoặc tên dùng chung để bảo toàn lịch sử.', 409);
       program.code = programCode; program.name = text(b.programName || program.name, 'tên chương trình', true, 200);
       const next = normalizeCurriculumVersion(state, b, old);
-      if (state.curriculumVersions.some(row => row.id !== old.id && row.programId === old.programId && row.version === text(b.version || old.version, 'phiên bản', true, 40))) throw new PortalError('Phiên bản chương trình đã tồn tại.', 409);
-      next.version = text(b.version || old.version, 'phiên bản', true, 40);
+      if (state.curriculumVersions.some(row => row.id !== old.id && row.programId === old.programId && row.version === text(b.version || old.version, 'mã bản chương trình', true, 40))) throw new PortalError('Bản chương trình này đã tồn tại.', 409);
+      next.version = text(b.version || old.version, 'mã bản chương trình', true, 40);
       validateCurriculumStructure(next, state, false);
       state.curriculumVersions[state.curriculumVersions.findIndex(row => row.id === old.id)] = next;
       entityId = next.id; break;
     }
     case 'curriculum.publish': {
       requireRole(actor, ['admin', 'academic']);
-      const version = get(state.curriculumVersions, b.id, 'phiên bản chương trình');
+      const version = get(state.curriculumVersions, b.id, 'chương trình đào tạo');
       if (version.status !== 'draft') throw new PortalError('Chỉ công bố được bản nháp.', 409);
       validateCurriculumStructure(version, state, true);
       const faculty = findCatalog(state, 'faculty', version.faculty);
       const major = faculty ? findCatalog(state, 'major', version.major, faculty.id) : undefined;
       const degreeSystem = findCatalog(state, 'degreeSystem', version.degreeSystem);
-      if (!faculty?.active || !major?.active || !degreeSystem?.active) throw new PortalError('Khoa, ngành hoặc hệ đào tạo trong phạm vi đã ngừng hoạt động; không thể công bố phiên bản mới.', 409);
+      if (!faculty?.active || !major?.active || !degreeSystem?.active) throw new PortalError('Khoa, ngành hoặc hệ đào tạo trong phạm vi đã ngừng hoạt động; không thể công bố chương trình mới.', 409);
       const conflict = state.curriculumVersions.find(row => row.id !== version.id && row.status === 'active'
         && catalogEqual('faculty', row.faculty, version.faculty, state.catalogs)
         && catalogEqual('major', row.major, version.major, state.catalogs)
         && catalogEqual('degreeSystem', row.degreeSystem, version.degreeSystem, state.catalogs)
         && row.intakeStartYear <= version.intakeEndYear && version.intakeStartYear <= row.intakeEndYear);
-      if (conflict) throw new PortalError(`Phạm vi đang chồng lấn với phiên bản ${conflict.version}. Hãy xác định lại khóa áp dụng hoặc ngừng phiên bản cũ trước.`, 409);
+      if (conflict) throw new PortalError('Phạm vi đang chồng lấn với một chương trình đang áp dụng. Hãy xác định lại khóa hoặc ngừng áp dụng chương trình cũ trước.', 409);
       version.status = 'active'; version.publishedAt = new Date().toISOString(); version.updatedAt = version.publishedAt;
       entityId = version.id; break;
     }
     case 'curriculum.retire': {
       requireRole(actor, ['admin', 'academic']);
-      const version = get(state.curriculumVersions, b.id, 'phiên bản chương trình');
-      if (version.status !== 'active') throw new PortalError('Chỉ ngừng áp dụng được phiên bản đang hoạt động.', 409);
+      const version = get(state.curriculumVersions, b.id, 'chương trình đào tạo');
+      if (version.status !== 'active') throw new PortalError('Chỉ ngừng áp dụng được chương trình đang hoạt động.', 409);
       version.status = 'retired'; version.updatedAt = new Date().toISOString(); entityId = version.id; break;
     }
     case 'user.save': {
@@ -366,7 +376,7 @@ export function mutate(state: PortalState, actor: Actor, action: string, b: Reco
       const curriculumProfile = { faculty: selection.faculty, major: selection.major, academicYear: selection.academicYear, degreeSystem };
       const unchangedProfile = !!old && catalogEqual('faculty', old.faculty, selection.faculty, state.catalogs) && catalogEqual('major', old.major, selection.major, state.catalogs) && catalogEqual('intake', old.academicYear, selection.academicYear, state.catalogs) && catalogEqual('degreeSystem', old.degreeSystem || '', degreeSystem, state.catalogs);
       const unresolvedLegacyAssignment = !!old && old.curriculumId === curriculumId && unchangedProfile && !assignedVersion;
-      if (curriculumId && !unresolvedLegacyAssignment && (!assignedVersion || !curriculumVersionMatchesStudent(assignedVersion, curriculumProfile) || (assignedVersion.status === 'draft') || (assignedVersion.status !== 'active' && assignedVersion.id !== old?.curriculumId))) throw new PortalError('Chương trình phải là phiên bản đã công bố phù hợp khoa, ngành, khóa và hệ đào tạo của sinh viên.');
+      if (curriculumId && !unresolvedLegacyAssignment && (!assignedVersion || !curriculumVersionMatchesStudent(assignedVersion, curriculumProfile) || (assignedVersion.status === 'draft') || (assignedVersion.status !== 'active' && assignedVersion.id !== old?.curriculumId))) throw new PortalError('Chương trình phải được công bố và phù hợp khoa, ngành, khóa và hệ đào tạo của sinh viên.');
       const previousCurriculumId = old?.curriculumId || null;
       const nextCurriculumId = curriculumId || null;
       if (previousCurriculumId !== nextCurriculumId) {
@@ -416,7 +426,10 @@ export function mutate(state: PortalState, actor: Actor, action: string, b: Reco
       if (status === 'open' && !state.meetings.some(meeting => meeting.sectionId === id)) throw new PortalError('Lớp chưa có lịch học. Hãy lưu lớp ở trạng thái Nháp, chọn “Lập lịch học”, sau đó mở đăng ký.');
       const registrationStart = timestamp(b.registrationStart), registrationEnd = timestamp(b.registrationEnd);
       if (registrationStart && registrationEnd && registrationStart >= registrationEnd) throw new PortalError('Hạn kết thúc phải sau hạn bắt đầu.');
-      put(state.sections, { id, code: c, subjectId: subject.id, semester, lecturerId: lecturer?.id || null, capacity, status, gradesLocked: old?.gradesLocked || false, registrationStart, registrationEnd });
+      const allowCrossProgram = flag(b.allowCrossProgram, old?.allowCrossProgram ?? false);
+      put(state.sections, { ...old, id, code: c, subjectId: subject.id, semester, lecturerId: lecturer?.id || null, capacity, status, gradesLocked: old?.gradesLocked || false, registrationStart, registrationEnd, allowCrossProgram, gradeWorkflowEnabled: old?.gradeWorkflowEnabled ?? false,
+        componentGradesPublishedAt: old?.componentGradesPublishedAt || '', componentReviewDeadline: old?.componentReviewDeadline || '',
+        componentsTransferredAt: old?.componentsTransferredAt || '', componentsTransferredById: old?.componentsTransferredById || null, componentsTransferredByName: old?.componentsTransferredByName || '' });
       validateSchedule(state); entityId = id; break;
     }
     case 'meeting.save': {
@@ -442,11 +455,13 @@ export function mutate(state: PortalState, actor: Actor, action: string, b: Reco
       const subject = get(state.subjects, section.subjectId, 'môn học');
       const active = state.enrollments.filter(e => e.status === 'registered');
       if (!student.active || !subject.active) throw new PortalError('Hồ sơ sinh viên hoặc môn học đã ngừng hoạt động.', 409);
-      const curriculumCodes = curriculumCourseCodesForStudent(state, student);
-      if (!curriculumCodes) throw new PortalError('Sinh viên chưa được gán chương trình đào tạo phù hợp; chưa thể đăng ký lớp tín chỉ.', 409);
-      if (!curriculumCodes.has(subject.code.toUpperCase())) throw new PortalError('Môn học không thuộc chương trình đào tạo của sinh viên.', 403);
-      const semesterCourses = plannedCourseCodesForStudentInSemester(state, student, section.semester);
-      if (!semesterCourses?.has(subject.code.toUpperCase())) throw new PortalError('Môn học không thuộc học kỳ tương ứng trong chương trình đào tạo của sinh viên.', 409);
+      if (!section.allowCrossProgram) {
+        const curriculumCodes = curriculumCourseCodesForStudent(state, student);
+        if (!curriculumCodes) throw new PortalError('Sinh viên chưa được gán chương trình đào tạo phù hợp; chưa thể đăng ký lớp tín chỉ.', 409);
+        if (!curriculumCodes.has(subject.code.toUpperCase())) throw new PortalError('Môn học không thuộc chương trình đào tạo của sinh viên.', 403);
+        const semesterCourses = plannedCourseCodesForStudentInSemester(state, student, section.semester);
+        if (!semesterCourses?.has(subject.code.toUpperCase())) throw new PortalError('Môn học không thuộc học kỳ tương ứng trong chương trình đào tạo của sinh viên.', 409);
+      }
       const issue = registrationIssue(section, active.filter(e => e.sectionId === section.id).length, state.meetings.some(m => m.sectionId === section.id));
       if (issue) throw new PortalError(issue, 409);
       if (active.some(e => e.studentId === student.id && state.sections.some(s => s.id === e.sectionId && s.subjectId === section.subjectId && catalogEqual('semester', s.semester, section.semester, state.catalogs)))) throw new PortalError('Đã đăng ký môn này trong cùng học kỳ.', 409);
@@ -472,19 +487,22 @@ export function mutate(state: PortalState, actor: Actor, action: string, b: Reco
       }
       entityId = 'batch'; break;
     }
+    case 'result.components.batch':
+    case 'section.components.publish':
+    case 'grade.reconciliation.submit':
+    case 'grade.reconciliation.resolve':
+    case 'section.components.transfer':
+    case 'result.official.publish':
+      throw new PortalError('Giáo vụ quản lý việc nhập và công bố điểm.', 403);
     case 'result.save': {
       const enrollment = get(state.enrollments, b.enrollmentId, 'đăng ký');
       editableSection(state, actor, enrollment.sectionId);
       if (enrollment.status !== 'registered') throw new PortalError('Sinh viên đã hủy lớp.', 409);
-      const score = (v: unknown) => {
-        if (v === null || v === '' || v === undefined) return null;
-        if (typeof v !== 'number' && typeof v !== 'string') throw new PortalError('Điểm không hợp lệ.');
-        const n = Number(v);
-        if (!Number.isFinite(n) || n < 0 || n > 10) throw new PortalError('Điểm phải trong khoảng 0 đến 10.');
-        return Math.round(n * 100) / 100;
-      };
       const old = state.results.find(r => r.enrollmentId === enrollment.id);
-      const row: Result = { id: old?.id || randomUUID(), enrollmentId: enrollment.id, attendance: score(b.attendance), midterm: score(b.midterm), exam: score(b.exam), published: flag(b.published, false), updatedAt: new Date().toISOString() };
+      const attendance = gradeScore(b.attendance), midterm = gradeScore(b.midterm), exam = gradeScore(b.exam);
+      const published = flag(b.published, false);
+      const updatedAt = new Date().toISOString();
+      const row: Result = { id: old?.id || randomUUID(), enrollmentId: enrollment.id, attendance, midterm, exam, published, publishedAt: published ? updatedAt : '', updatedAt };
       if (row.published && gradeSummary(row).final === null) throw new PortalError('Phải nhập đủ ba điểm trước khi công bố.');
       put(state.results, row); entityId = row.id; break;
     }
@@ -495,6 +513,10 @@ export function mutate(state: PortalState, actor: Actor, action: string, b: Reco
       if (locked) {
         const enrollments = state.enrollments.filter(e => e.sectionId === section.id && e.status === 'registered');
         if (!enrollments.length || enrollments.some(e => !state.results.some(r => r.enrollmentId === e.id && r.published && gradeSummary(r).final !== null))) throw new PortalError('Chỉ khóa khi toàn bộ sinh viên đã có điểm đầy đủ và đã công bố.');
+        const results = enrollments.map(enrollment => state.results.find(result => result.enrollmentId === enrollment.id)!);
+        const deadline = officialAppealDeadline(results);
+        if (!deadline || Date.now() <= Date.parse(deadline)) throw new PortalError(`Chỉ khóa sau khi đã hết thời hạn phúc khảo 30 ngày${deadline ? ` (${deadline.slice(0, 10)})` : ''}.`, 409);
+        if (state.supportTickets.some(ticket => ticket.category === 'grade_appeal' && ticket.appealSectionId === section.id && ticket.status !== 'closed')) throw new PortalError('Chưa thể khóa khi còn yêu cầu phúc khảo đang xử lý.', 409);
       }
       section.gradesLocked = locked; entityId = section.id; break;
     }
@@ -522,18 +544,22 @@ export function view(state: PortalState, actor: Actor, storage: PortalView['stor
   if (actor.role === 'student') {
     const curriculumCodes = own ? curriculumCourseCodesForStudent(state, own) : null;
     const ownSectionIds = new Set(enrollments.filter(row => row.status === 'registered').map(row => row.sectionId));
-    const visibleSectionIds = new Set(state.sections.filter(section => {
+    const isInPlannedProgram = (section: Section) => {
       const course = state.subjects.find(row => row.id === section.subjectId);
-      if (curriculumCodes) {
-        if (!course || !curriculumCodes.has(course.code.toUpperCase())) return false;
-        if (ownSectionIds.has(section.id)) return true;
-        if (section.status !== 'open') return false;
-        const plannedCourses = plannedCourseCodesForStudentInSemester(state, own!, section.semester);
-        return !!plannedCourses?.has(course.code.toUpperCase());
-      }
-      return ownSectionIds.has(section.id);
-    }).map(section => section.id));
-    sections = state.sections.filter(section => visibleSectionIds.has(section.id));
+      if (!own || !curriculumCodes || !course || !curriculumCodes.has(course.code.toUpperCase())) return false;
+      return !!plannedCourseCodesForStudentInSemester(state, own, section.semester)?.has(course.code.toUpperCase());
+    };
+    const visibleSections = state.sections.filter(section => {
+      if (ownSectionIds.has(section.id)) return true;
+      if (section.status !== 'open') return false;
+      if (section.allowCrossProgram) return true;
+      return isInPlannedProgram(section);
+    }).map(section => ({
+      ...section,
+      outsideCurriculum: (section.allowCrossProgram || ownSectionIds.has(section.id)) && !isInPlannedProgram(section),
+    }));
+    const visibleSectionIds = new Set(visibleSections.map(section => section.id));
+    sections = visibleSections;
     subjects = state.subjects.filter(subject => curriculumCodes?.has(subject.code.toUpperCase()) || sections.some(section => section.subjectId === subject.id));
     meetings = state.meetings.filter(meeting => visibleSectionIds.has(meeting.sectionId));
   }
@@ -563,8 +589,21 @@ export function view(state: PortalState, actor: Actor, storage: PortalView['stor
     cohorts: visibleCohorts, subjects, sections, meetings,
     catalogs: actor.role === 'lecturer' ? state.catalogs.filter(row => row.kind === 'semester') : state.catalogs,
     lecturers: staff ? state.lecturers : actor.role === 'lecturer' ? state.lecturers.filter(row => row.code === actor.lecturerCode) : state.lecturers.filter(row => row.active),
-    enrollments, results: state.results.filter(r => enrollmentIds.has(r.enrollmentId) && (actor.role !== 'student' && actor.role !== 'lecturer' || r.published)),
-    cancellationIssues: Object.fromEntries(enrollments.map(e => [e.id, cancellationIssue(state.sections.find(s => s.id === e.sectionId)!, state.results.find(r => r.enrollmentId === e.id), actor.role === 'student') || ''])),
+    enrollments,
+    results: state.results.flatMap(result => {
+      if (!enrollmentIds.has(result.enrollmentId)) return [];
+      if (actor.role === 'lecturer') return [result];
+      if (actor.role === 'student') {
+        if (result.published) return [result];
+        return [];
+      }
+      return [result];
+    }),
+    gradeReconciliations: [],
+    cancellationIssues: Object.fromEntries(enrollments.map(e => {
+      const section = state.sections.find(row => row.id === e.sectionId)!;
+      return [e.id, cancellationIssue(section, state.results.find(r => r.enrollmentId === e.id), actor.role === 'student') || ''];
+    })),
     audits: staff ? state.audits.slice(-200).reverse() : [],
     ...(actor.role === 'student' ? { studentAcademicCalendar } : {}),
     ...(staff ? { curriculumPrograms: state.curriculumPrograms, curriculumVersions: state.curriculumVersions, curriculumAssignments: state.curriculumAssignments } : {}),

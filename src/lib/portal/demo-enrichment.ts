@@ -68,16 +68,15 @@ function ensureMeeting(state: PortalState, section: Section, room: string, start
 function ensureSection(state: PortalState, subject: Subject, code: string, semester: string, capacity: number, lecturerId: string, status: Section['status'], room: string, startDate: string, endDate: string) {
   let section = state.sections.find(row => row.subjectId === subject.id && sameSemester(row.semester, semester, state.catalogs));
   if (!section) {
-    const parsed = parseSemester(semester);
-    const semesterSuffix = sameSemester(semester, configuredCurrentSemester(), state.catalogs) ? '01' : parsed
-      ? `HK${parsed.term}-${parsed.startYear}-${parsed.endYear}-01`
-      : 'HIST-01';
-    const sectionCode = `${code}-${semesterSuffix}`;
-    const collision = state.sections.find(row => row.code === sectionCode);
-    const uniqueCode = collision ? `${sectionCode}-${state.sections.filter(row => row.code.startsWith(`${sectionCode}-`)).length + 2}` : sectionCode;
+    let sectionNumber = 1;
+    let sectionCode = `${code}-${String(sectionNumber).padStart(2, '0')}`;
+    while (state.sections.some(row => row.code.toUpperCase() === sectionCode.toUpperCase())) {
+      sectionNumber += 1;
+      sectionCode = `${code}-${String(sectionNumber).padStart(2, '0')}`;
+    }
     section = {
-      id: `section-${uniqueCode}`,
-      code: uniqueCode,
+      id: `section-${sectionCode}`,
+      code: sectionCode,
       subjectId: subject.id,
       semester,
       lecturerId,

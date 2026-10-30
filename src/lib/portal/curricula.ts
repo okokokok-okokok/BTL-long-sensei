@@ -66,7 +66,7 @@ export function importLegacyDemoCurricula(state: PortalState): boolean {
       const requiredCredits = rawCourses.filter(row => row.course.required).reduce((sum, row) => sum + row.course.credits, 0);
       const optionalCourses = rawCourses.filter(row => !row.course.required);
       const electiveGroupId = optionalCourses.length ? `${definition.id}-legacy-electives` : null;
-      const electiveGroups = electiveGroupId ? [{ id: electiveGroupId, name: 'Tự chọn theo khung cũ', minCredits: Math.max(0, definition.plan.totalCredits - requiredCredits) }] : [];
+      const electiveGroups = electiveGroupId ? [{ id: electiveGroupId, name: 'Tự chọn', minCredits: Math.max(0, definition.plan.totalCredits - requiredCredits) }] : [];
       const courses: CurriculumCourseEntry[] = rawCourses.map(({ term, course }) => ({
         id: `${definition.id}-course-${course.code.toUpperCase()}`,
         termId: `${definition.id}-term-${term.semesterId}`,
@@ -113,7 +113,7 @@ export function importLegacyDemoCurricula(state: PortalState): boolean {
 
 export function curriculumVersionLabel(version: CurriculumVersion, programs: CurriculumProgram[]) {
   const program = programs.find(row => row.id === version.programId);
-  return `${program?.name || version.major} · ${version.degreeSystem} · phiên bản ${version.version}`;
+  return `${program?.name || version.major} · ${version.degreeSystem}`;
 }
 
 export function actualSemesterForTerm(version: CurriculumVersion, student: Student, term: CurriculumVersion['terms'][number]) {

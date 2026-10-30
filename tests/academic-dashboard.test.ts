@@ -51,7 +51,7 @@ function fixture(): PortalState {
       { id: 'a1', actorId: 'admin', actorName: 'Admin', action: 'result.save', entityId: 'r-zero', createdAt: '2026-10-20T00:00:00.000Z' },
       { id: 'a2', actorId: 'admin', actorName: 'Admin', action: 'section.save', entityId: 'sec-progress', createdAt: '2026-10-21T00:00:00.000Z' },
     ],
-    supportTickets: [],
+    supportTickets: [], gradeReconciliations: [],
     catalogs: [], lecturers: [], curriculumPrograms: [], curriculumVersions: [], curriculumAssignments: [],
   };
 }

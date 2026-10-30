@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { SupportCategory, SupportReceiverUnit, SupportRequest, SupportRequestView, SupportStatus } from '@/types/support-request';
 import { gradeSummary } from './analytics';
+import { appealWindowOpen } from './grade-workflow';
 import type { PortalState } from './types';
 
 export const isSupportCategory = (value: unknown): value is SupportCategory =>
@@ -93,7 +94,7 @@ export function publishedAppealOptions(state: PortalState, studentId: string) {
     .flatMap(enrollment => {
       const section = state.sections.find(row => row.id === enrollment.sectionId);
       const result = state.results.find(row => row.enrollmentId === enrollment.id);
-      if (!section || !result?.published) return [];
+      if (!section || !result?.published || !appealWindowOpen(result)) return [];
       const summary = gradeSummary(result);
       if (summary.final === null) return [];
       const subject = state.subjects.find(row => row.id === section.subjectId);

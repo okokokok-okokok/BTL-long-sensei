@@ -27,11 +27,12 @@ export function legacyCourses(state: PortalState, actor: Actor, includeRoster = 
   return state.sections.filter(section => {
     if (actor.role === 'lecturer') return section.lecturerId === actor.id;
     if (actor.role !== 'student') return true;
+    if (ownSectionIds.has(section.id)) return true;
+    if (section.status !== 'open') return false;
+    if (section.allowCrossProgram) return true;
     const course = state.subjects.find(row => row.id === section.subjectId);
     if (!curriculumCodes || !own) return ownSectionIds.has(section.id);
     if (!course || !curriculumCodes.has(course.code.toUpperCase())) return false;
-    if (ownSectionIds.has(section.id)) return true;
-    if (section.status !== 'open') return false;
     return !!plannedCourseCodesForStudentInSemester(state, own, section.semester)?.has(course.code.toUpperCase());
   }).map(section => {
     const subject = state.subjects.find(s => s.id === section.subjectId)!;

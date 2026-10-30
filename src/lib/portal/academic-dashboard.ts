@@ -110,6 +110,12 @@ function auditDetails(state: PortalState, audit: Audit) {
     'enrollment.cancel': 'Hủy đăng ký học phần',
     'result.save': 'Cập nhật điểm',
     'result.batch': 'Cập nhật điểm hàng loạt',
+    'result.components.batch': 'Lưu điểm thành phần',
+    'section.components.publish': 'Công bố điểm thành phần',
+    'section.components.transfer': 'Chuyển điểm thành phần cho Giáo vụ',
+    'grade.reconciliation.submit': 'Gửi yêu cầu đối soát',
+    'grade.reconciliation.resolve': 'Xử lý yêu cầu đối soát',
+    'result.official.publish': 'Công bố điểm chính thức',
     'section.lock': 'Khóa / mở khóa bảng điểm',
   };
   const section = state.sections.find(row => row.id === audit.entityId);
@@ -120,9 +126,10 @@ function auditDetails(state: PortalState, audit: Audit) {
   const meeting = state.meetings.find(row => row.id === audit.entityId);
   const enrollment = state.enrollments.find(row => row.id === audit.entityId);
   const result = state.results.find(row => row.id === audit.entityId);
-  const relatedEnrollment = enrollment || (result ? state.enrollments.find(row => row.id === result.enrollmentId) : undefined);
-  const relatedSection = section || (meeting ? state.sections.find(row => row.id === meeting.sectionId) : undefined) || (relatedEnrollment ? state.sections.find(row => row.id === relatedEnrollment.sectionId) : undefined);
-  const relatedStudent = student || (relatedEnrollment ? state.students.find(row => row.id === relatedEnrollment.studentId) : undefined);
+  const reconciliation = state.gradeReconciliations.find(row => row.id === audit.entityId);
+  const relatedEnrollment = enrollment || (result ? state.enrollments.find(row => row.id === result.enrollmentId) : undefined) || (reconciliation ? state.enrollments.find(row => row.id === reconciliation.enrollmentId) : undefined);
+  const relatedSection = section || (meeting ? state.sections.find(row => row.id === meeting.sectionId) : undefined) || (reconciliation ? state.sections.find(row => row.id === reconciliation.sectionId) : undefined) || (relatedEnrollment ? state.sections.find(row => row.id === relatedEnrollment.sectionId) : undefined);
+  const relatedStudent = student || (reconciliation ? state.students.find(row => row.id === reconciliation.studentId) : undefined) || (relatedEnrollment ? state.students.find(row => row.id === relatedEnrollment.studentId) : undefined);
   const entity = user ? `Tài khoản ${user.username}`
     : student ? `Sinh viên ${student.code} · ${student.name}`
       : cohort ? `Lớp niên khóa ${cohort.code}`
@@ -230,7 +237,7 @@ export function buildAcademicDashboard(
       unassigned: taskSections(section => !section.lecturerId),
       noSchedule: taskSections(section => !state.meetings.some(meeting => meeting.sectionId === section.id)),
       noGrades: taskSections((section, row) => row.enrollmentCount > 0 && row.status === 'not-started'),
-      gradeInProgress: taskSections((section, row) => row.enrollmentCount > 0 && row.status === 'in-progress'),
+      gradeInProgress: taskSections((_section, row) => row.enrollmentCount > 0 && row.status === 'in-progress'),
       readyToLock: taskSections((section, row) => row.enrollmentCount > 0 && row.status === 'published-unlocked'),
     },
     registration,

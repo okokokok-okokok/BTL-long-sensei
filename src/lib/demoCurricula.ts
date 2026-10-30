@@ -2,12 +2,13 @@ import type { CurriculumPlan } from '@/types/curriculum';
 import { ptitTelecomCurriculum } from '@/lib/curriculumData';
 
 type CourseSpec = [code: string, name: string, credits: number];
+const generatedCourseCodes = new Set<string>();
 const informationTechnology: CourseSpec[] = [
   ['INT1306','Cấu trúc dữ liệu và giải thuật',3],['INT1468','Lập trình hướng đối tượng',3],['INT3401','Kỹ thuật phần mềm',3],['INT3306','Lập trình Web',3],['INT3502','Trí tuệ nhân tạo',3],['INT3308','Phát triển ứng dụng di động',3],
-  ['DEMO-CNTT-07','Toán rời rạc',3],['DEMO-CNTT-08','Kiến trúc máy tính',3],['DEMO-CNTT-09','Hệ điều hành',3],['DEMO-CNTT-10','Mạng máy tính',3],['DEMO-CNTT-11','Cơ sở dữ liệu nâng cao',3],['DEMO-CNTT-12','Phân tích thiết kế hệ thống',3],['DEMO-CNTT-13','Phát triển ứng dụng phía máy chủ',3],['DEMO-CNTT-14','Kiểm thử phần mềm',3],['DEMO-CNTT-15','Khai phá dữ liệu',3],['DEMO-CNTT-16','Điện toán đám mây',3],
+  ['INT2007','Toán rời rạc',3],['INT2008','Kiến trúc máy tính',3],['INT2009','Hệ điều hành',3],['INT2010','Mạng máy tính',3],['INT2011','Cơ sở dữ liệu nâng cao',3],['INT2012','Phân tích thiết kế hệ thống',3],['INT2013','Phát triển ứng dụng phía máy chủ',3],['INT2014','Kiểm thử phần mềm',3],['INT2015','Khai phá dữ liệu',3],['INT2016','Điện toán đám mây',3],
 ];
 const cyberSecurity: CourseSpec[] = [
-  ['INT1339','Mạng máy tính',3],['INT1334','An toàn mạng',3],['DEMO-ATTT-03','Nhập môn an toàn thông tin',3],['DEMO-ATTT-04','Mật mã học cơ sở',3],['DEMO-ATTT-05','Hệ điều hành an toàn',3],['DEMO-ATTT-06','An ninh mạng',3],['DEMO-ATTT-07','Điều tra số',3],['DEMO-ATTT-08','Kiểm thử xâm nhập',3],['DEMO-ATTT-09','Quản trị sự cố an toàn thông tin',3],['DEMO-ATTT-10','Bảo mật ứng dụng Web',3],['DEMO-ATTT-11','Phân tích mã độc',3],['DEMO-ATTT-12','An toàn hệ thống thông tin',3],['DEMO-ATTT-13','Bảo mật mạng không dây',3],['DEMO-ATTT-14','Quản trị định danh và truy cập',3],['DEMO-ATTT-15','Pháp chứng kỹ thuật số',3],['DEMO-ATTT-16','Đồ án an toàn thông tin',4],
+  ['INT1339','Mạng máy tính',3],['INT1334','An toàn mạng',3],['INT4003','Nhập môn an toàn thông tin',3],['INT4004','Mật mã học cơ sở',3],['INT4005','Hệ điều hành an toàn',3],['INT4006','An ninh mạng',3],['INT4007','Điều tra số',3],['INT4008','Kiểm thử xâm nhập',3],['INT4009','Quản trị sự cố an toàn thông tin',3],['INT4010','Bảo mật ứng dụng Web',3],['INT4011','Phân tích mã độc',3],['INT4012','An toàn hệ thống thông tin',3],['INT4013','Bảo mật mạng không dây',3],['INT4014','Quản trị định danh và truy cập',3],['INT4015','Pháp chứng kỹ thuật số',3],['INT4016','Đồ án an toàn thông tin',4],
 ];
 function plan(majorCode: string, majorName: string, facultyName: string, cohort: string, source: CourseSpec[]): CurriculumPlan {
   const shared = ptitTelecomCurriculum.semesters.flatMap(semester=>semester.courses).slice(0,12);
@@ -19,7 +20,8 @@ function plan(majorCode: string, majorName: string, facultyName: string, cohort:
       const actualIndex=unused.findIndex(course=>course[2]===base.credits);
       const actual=actualIndex>=0?unused.splice(actualIndex,1)[0]:undefined;
       const title=actual?.[1] || (sequence<=12?shared[sequence-1].name:`${source[(sequence-13)%source.length]?.[1] || majorName} · ${['cơ sở','thực hành','nâng cao','chuyên sâu'][(Math.floor((sequence-13)/source.length))%4]}`);
-      const code=actual?.[0] || (sequence<=12?shared[sequence-1].code:`${majorCode}-CORE-${String(sequence).padStart(2,'0')}`);
+      const code=actual?.[0] || (sequence<=12?shared[sequence-1].code:`INT${majorCode === 'ATTT' ? '5' : '3'}${String(sequence).padStart(3,'0')}`);
+      if (!actual && sequence > 12) generatedCourseCodes.add(code);
       return {stt:sequence,code,name:title,specialization:'Môn dùng chung / học phần mô phỏng',credits:base.credits,required:true,completed:false,totalHours:base.totalHours,theoryHours:base.theoryHours,practiceHours:base.practiceHours};
     });
     const startYear=2024+Math.floor(index/2);
@@ -27,8 +29,8 @@ function plan(majorCode: string, majorName: string, facultyName: string, cohort:
   });
   return {majorCode,majorName,facultyName,degreeType:'Chương trình đại học (mô phỏng)',totalCredits:ptitTelecomCurriculum.totalCredits,trainingTime:ptitTelecomCurriculum.trainingTime,cohort,semesters};
 }
-export const informationTechnologyCurriculum=plan('DEMO-CNTT','Công nghệ thông tin','Khoa Công nghệ thông tin 1','Khóa 2024-2028',informationTechnology);
-export const cyberSecurityCurriculum=plan('DEMO-ATTT','An toàn thông tin','Khoa An toàn thông tin','Khóa 2024-2028',cyberSecurity);
+export const informationTechnologyCurriculum=plan('CNTT','Công nghệ thông tin','Khoa Công nghệ thông tin 1','Khóa 2024-2028',informationTechnology);
+export const cyberSecurityCurriculum=plan('ATTT','An toàn thông tin','Khoa An toàn thông tin','Khóa 2024-2028',cyberSecurity);
 
 function swapCourseContent(left: CurriculumPlan['semesters'][number]['courses'][number], right: CurriculumPlan['semesters'][number]['courses'][number]) {
   const fields = ['code', 'name', 'specialization', 'credits', 'required', 'completed', 'totalHours', 'theoryHours', 'practiceHours'] as const;
@@ -46,7 +48,7 @@ function moveCoursesToSemester(curriculum: CurriculumPlan, semesterId: number, c
     const source = sourceTerm?.courses.find(course => course.code === code);
     if (!source || !sourceTerm) throw new Error(`Missing ${code} in ${curriculum.majorCode}.`);
     if (sourceTerm === target) continue;
-    const donor = target.courses.find(course => !requested.has(course.code) && course.code.startsWith('DEMO-') && course.credits === source.credits);
+    const donor = target.courses.find(course => !requested.has(course.code) && generatedCourseCodes.has(course.code) && course.credits === source.credits);
     if (!donor) throw new Error(`No matching demo course slot for ${code} in ${curriculum.majorCode}.`);
     swapCourseContent(source, donor);
   }

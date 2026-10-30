@@ -2,7 +2,7 @@
 
 import { apiFetch } from '@/lib/apiFetch';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthUser, UserRole } from '@/types/auth';
 
@@ -21,11 +21,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const sessionCheckStarted = useRef(false);
   const router = useRouter();
 
   // 1. Check session on mount (Strictly session-scoped to the active browser tab)
   useEffect(() => {
-    checkSession();
+    if (sessionCheckStarted.current) return;
+    sessionCheckStarted.current = true;
+    void checkSession();
   }, []);
 
   const checkSession = async () => {

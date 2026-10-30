@@ -7,6 +7,7 @@ export const CATALOG_KINDS: { value: CatalogKind; label: string }[] = [
 export const ROLE_LABELS = { admin: 'Admin', academic: 'Giáo vụ', lecturer: 'Giảng viên', student: 'Sinh viên' };
 export const ROLE_OPTIONS = Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
 export const ACTIVE_OPTIONS = [{ value: 'true', label: 'Đang hoạt động' }, { value: 'false', label: 'Ngừng hoạt động' }];
+export const CROSS_PROGRAM_OPTIONS = [{ value: 'false', label: 'Không' }, { value: 'true', label: 'Có' }];
 export const SECTION_STATUS_OPTIONS = [{ value: 'draft', label: 'Nháp' }, { value: 'open', label: 'Mở đăng ký' }, { value: 'closed', label: 'Đóng đăng ký' }];
 export const SUPPORT_CATEGORY_LABELS = { grade_appeal: 'Phúc khảo điểm', academic_support: 'Hỗ trợ học vụ', account_website: 'Tài khoản & Báo lỗi website', other: 'Yêu cầu khác' };
 export const SUPPORT_STATUS_LABELS = { pending: 'Chờ xử lý', in_progress: 'Đang xử lý', closed: 'Đã kết thúc' };

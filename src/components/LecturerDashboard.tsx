@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -31,6 +31,7 @@ export function LecturerDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [semester, setSemester] = useState('');
+  const initialLoadForUser = useRef('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,11 +49,16 @@ export function LecturerDashboard() {
   }, []);
 
   useEffect(() => {
-    if (!authLoading && role === 'lecturer' && userId) {
-      void load();
-      const unsubscribe = onPortalChanged(load);
-      return () => unsubscribe();
+    if (authLoading || role !== 'lecturer' || !userId) {
+      if (!userId) initialLoadForUser.current = '';
+      return;
     }
+    if (initialLoadForUser.current !== userId) {
+      initialLoadForUser.current = userId;
+      void load();
+    }
+    const unsubscribe = onPortalChanged(load);
+    return () => unsubscribe();
   }, [authLoading, role, userId, load]);
 
   const semesters = useMemo(() => {

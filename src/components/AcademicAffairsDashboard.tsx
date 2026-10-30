@@ -215,17 +215,7 @@ export default function AcademicAffairsDashboard() {
       </div>
     </section>
 
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-      <SectionTitle title="Thao tác nhanh" subtitle="Mở biểu mẫu nghiệp vụ đang có trong Quản lý đào tạo." />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <QuickAction href={`/academic?${paramsForManagement('students', { action: 'create-student' })}`} label="Thêm hồ sơ sinh viên" icon={Users} />
-        <QuickAction href={`/academic?${paramsForManagement('cohorts', { action: 'create-cohort' })}`} label="Tạo lớp niên khóa" icon={GraduationCap} />
-        <QuickAction href={`/academic?${paramsForManagement('sections', { action: 'create-section' })}`} label="Tạo lớp tín chỉ" icon={ClipboardList} />
-        <QuickAction href={`/academic?${paramsForManagement('sections', { action: 'assign-lecturer' })}`} label="Phân công giảng viên" icon={Users} />
-        <QuickAction href={`/schedule?${new URLSearchParams({ semester: term, action: 'create-meeting' })}`} label="Lập thời khóa biểu" icon={CalendarDays} />
-        <QuickAction href={gradeReportUrl} label="Tra cứu kết quả học tập" icon={CheckCircle2} />
-      </div>
-    </section>
+
 
     <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
       <SectionTitle title="Tình hình đăng ký" subtitle={`Sĩ số tính từ đăng ký còn hiệu lực trong ${term}; đăng ký đã hủy không được tính.`} action={<Link className={`${secondary} w-full sm:w-auto`} href={currentSectionsUrl('registered')}>Quản lý lớp tín chỉ <ArrowRight size={15} /></Link>} />
@@ -273,8 +263,4 @@ function ProgressMetric({ title, value }: { title: string; value: number }) {
 
 function ReportMetric({ label, value }: { label: string; value: string }) {
   return <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-950"><p className="text-xs leading-5 text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold">{value}</p></div>;
-}
-
-function QuickAction({ href, label, icon: Icon }: { href: string; label: string; icon: typeof Users }) {
-  return <Link href={href} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold transition hover:border-red-300 hover:bg-red-50 hover:text-primary dark:border-slate-800 dark:hover:border-red-900 dark:hover:bg-red-950/30"><span className="flex items-center gap-3"><Icon size={18} className="text-primary" />{label}</span><ArrowRight size={15} /></Link>;
 }

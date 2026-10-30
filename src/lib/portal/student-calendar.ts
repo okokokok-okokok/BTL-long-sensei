@@ -50,9 +50,9 @@ export function buildStudentAcademicCalendar(
   const defaultSemester = current || mostRecentActual || actualSemesters[0]?.value || '';
   let issue: string | undefined;
   if (!student.curriculumId) issue = 'Sinh viên chưa được gán chương trình đào tạo.';
-  else if (!rawAssigned) issue = 'Không tìm thấy phiên bản chương trình được gán.';
-  else if (rawAssigned.status === 'draft') issue = 'Phiên bản được gán chưa được công bố.';
-  else if (!version) issue = 'Phiên bản chương trình không phù hợp hồ sơ ngành, khóa hoặc hệ đào tạo hiện tại.';
+  else if (!rawAssigned) issue = 'Không tìm thấy chương trình đang được gán.';
+  else if (rawAssigned.status === 'draft') issue = 'Chương trình đang được gán chưa được công bố.';
+  else if (!version) issue = 'Chương trình đang được gán không phù hợp hồ sơ ngành, khóa hoặc hệ đào tạo hiện tại.';
   return {
     programAssigned: !!version,
     curriculumId: version?.id || null,

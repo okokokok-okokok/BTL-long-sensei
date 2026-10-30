@@ -134,6 +134,7 @@ model PortalStudent {
   cohort PortalCohort? @relation(fields: [cohortId], references: [id], onDelete: Restrict)
   enrollments PortalEnrollment[]
   curriculumAssignments PortalCurriculumAssignment[]
+  gradeReconciliations PortalGradeReconciliation[]
   @@map("portal_students")
 }
 
@@ -141,7 +142,7 @@ model PortalSubject {
   id String @id @default(uuid())
   code String @unique
   name String 
-  credits Int 
+  credits Float
   department String 
   active Boolean @default(true)
   sections PortalSection[]
@@ -159,12 +160,20 @@ model PortalSection {
   gradesLocked Boolean @default(false)
   registrationStart String @default("")
   registrationEnd String @default("")
+  allowCrossProgram Boolean @default(false)
+  gradeWorkflowEnabled Boolean @default(false)
+  componentGradesPublishedAt String @default("")
+  componentReviewDeadline String @default("")
+  componentsTransferredAt String @default("")
+  componentsTransferredById String?
+  componentsTransferredByName String @default("")
   @@index([subjectId])
   @@index([lecturerId])
   subject PortalSubject @relation(fields: [subjectId], references: [id], onDelete: Restrict)
   lecturer PortalUser? @relation(fields: [lecturerId], references: [id], onDelete: Restrict)
   meetings PortalMeeting[]
   enrollments PortalEnrollment[]
+  gradeReconciliations PortalGradeReconciliation[]
   @@map("portal_sections")
 }
 
@@ -193,6 +202,7 @@ model PortalEnrollment {
   section PortalSection @relation(fields: [sectionId], references: [id], onDelete: Restrict)
   student PortalStudent @relation(fields: [studentId], references: [id], onDelete: Restrict)
   result PortalResult?
+  gradeReconciliations PortalGradeReconciliation[]
   @@unique([sectionId, studentId])
   @@map("portal_enrollments")
 }
@@ -204,10 +214,32 @@ model PortalResult {
   midterm Float? 
   exam Float? 
   published Boolean @default(false)
+  publishedAt String @default("")
   updatedAt String 
   @@index([enrollmentId])
   enrollment PortalEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
   @@map("portal_results")
+}
+
+model PortalGradeReconciliation {
+  id String @id
+  sectionId String
+  enrollmentId String
+  studentId String
+  message String
+  status String @default("open")
+  resolution String @default("")
+  createdAt String
+  updatedAt String
+  resolvedAt String?
+  resolvedById String?
+  resolvedByName String @default("")
+  @@index([sectionId, status])
+  @@index([studentId, createdAt])
+  section PortalSection @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  enrollment PortalEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  student PortalStudent @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  @@map("portal_grade_reconciliations")
 }
 
 model PortalAudit {

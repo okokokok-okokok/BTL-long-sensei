@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/apiFetch';
 import { useAuth } from '@/context/AuthContext';
@@ -11,13 +11,44 @@ export function PersonalTodaySchedule() {
   const { user } = useAuth();
   const [data, setData] = useState<PortalView | null>(null);
   const [error, setError] = useState('');
+  const request = useRef<{ userId: string; promise: Promise<PortalView> } | null>(null);
   useEffect(() => {
+    if (!user?.id) {
+      request.current = null;
+      setData(null);
+      setError('');
+      return;
+    }
     let active = true;
-    const load = () => {
-      apiFetch('/api/portal').then(async response => { const json = await response.json(); if (!response.ok) throw new Error(json.message); if (active) setData(json.data); }).catch(e => { if (active) setError(e.message); });
+    const load = (force = false) => {
+      if (!force && request.current?.userId === user.id) {
+        const existing = request.current.promise;
+        void existing.then(value => {
+          if (active && request.current?.promise === existing) setData(value);
+        }).catch(e => {
+          if (active && request.current?.promise === existing) setError(e.message);
+        });
+        return;
+      }
+      setError('');
+      if (request.current?.userId !== user.id) setData(null);
+      const promise = apiFetch('/api/portal').then(async response => {
+        const json = await response.json();
+        if (!response.ok) throw new Error(json.message);
+        return json.data as PortalView;
+      });
+      request.current = { userId: user.id, promise };
+      void promise.then(value => {
+        if (active && request.current?.promise === promise) setData(value);
+      }).catch(e => {
+        if (active && request.current?.promise === promise) {
+          setError(e.message);
+          request.current = null;
+        }
+      });
     };
     load();
-    const unsubscribe = onPortalChanged(load);
+    const unsubscribe = onPortalChanged(() => load(true));
     return () => { active = false; unsubscribe(); };
   }, [user?.id]);
   const now = new Date();

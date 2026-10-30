@@ -1,0 +1,2 @@
+ALTER TABLE portal_sections
+  ADD COLUMN IF NOT EXISTS "allowCrossProgram" BOOLEAN NOT NULL DEFAULT FALSE;

@@ -28,6 +28,9 @@ async function main() {
     await db.query(await fs.readFile('database/003_directories.sql', 'utf8'));
     await db.query(await fs.readFile('database/004_student_curriculum.sql', 'utf8'));
     await db.query(await fs.readFile('database/005_curriculum_management.sql', 'utf8'));
+    await db.query(await fs.readFile('database/006_fractional_subject_credits.sql', 'utf8'));
+    await db.query(await fs.readFile('database/007_cross_program_sections.sql', 'utf8'));
+    await db.query(await fs.readFile('database/008_grade_component_handoff.sql', 'utf8'));
     let previous = exists.rows[0]?.name ? await loadState(adapter) : null;
     await fs.writeFile(path.join(directory, 'before-upgrade.json'), JSON.stringify({ createdAt: new Date().toISOString(), legacy: snapshot, portal: previous }, null, 2), { mode: 0o600 });
     if (previous) {
